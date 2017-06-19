@@ -12,6 +12,7 @@ local start = function(mode)
   return 0
 end
 gps.start = start
+gps.gpsstart = start
 
 local stop = function()
   print("GPS: stop")
@@ -26,5 +27,11 @@ local gpsinfo = function()
 end
 gps.gpsinfo = gpsinfo
 
+local close = function()
+  print("GPS: close")
+  return 0
+end
+gps.close = close
+gps.gpsclose = close
 
 return gps

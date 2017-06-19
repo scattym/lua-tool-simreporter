@@ -6,8 +6,8 @@ local getinfo = function(filter)
   local return_str = ""
   
   if bit32.band(filter, 0x1) == 0x1 then
-    print("NMEA: GCA")
-    return_str = return_str .. "nmea: unknown string\r\n"
+    print("NMEA: GGA")
+    return_str = return_str .. "$GPGGA,092751.000,5321.6802,N,00630.3371,W,1,8,1.03,61.7,M,55.3,M,,*75\r\n"
   end
   
   if bit32.band(filter, 0x2) == 0x2 then
@@ -27,12 +27,12 @@ local getinfo = function(filter)
   
   if bit32.band(filter, 0x10) == 0x10 then
     print("NMEA: VTG") 
-    return_str = return_str .. "nmea: unknown string\r\n"
+    return_str = return_str .. "$GPVTG,,T,,M,0.00,N,0.00,K*4E\r\n"
   end
   
   if bit32.band(filter, 0x20) == 0x20 then
     print("NMEA: PSTIS")
-    return_str = return_str .. "nmea: unknown string\r\n"
+    return_str = return_str .. "$PSTIS,*61\r\n"
   end
 
   return return_str
@@ -47,9 +47,15 @@ nmea.open = open
   
 
 local recv = function(wait)
+  print("NMEA: recv")
   return getinfo(MODE)
 end
 nmea.recv = recv
  
+local close = function()
+  print("NMEA: close")
+  return 0
+end
+nmea.close = close
 
 return nmea
