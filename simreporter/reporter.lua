@@ -8,7 +8,7 @@ local NMEA_EVENT = 35
 local recv_count = 0
 
 
-result = gps.start(0x1)
+result = gps.gpsstart(0x1)
 while(recv_count < 50) do
   recv_count = recv_count + 1
   local nmea_info = nmea.getinfo(1)
@@ -18,7 +18,7 @@ end
 
 
 local recv_count = 0;
-gps.start(1);
+gps.gpsstart(1);
 nmea.open(63);
 while (true) do
   local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(999999);
