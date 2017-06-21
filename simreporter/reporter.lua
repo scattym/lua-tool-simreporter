@@ -34,7 +34,7 @@ while (true) do
         end
         tcp.send_data("theforeman.do.scattym.com", 65535, nmea_data)
         print(nmea_data);
-        if (recv_count >= 100) then
+        if (recv_count >= 5) then
           break;
         end;
       end;
