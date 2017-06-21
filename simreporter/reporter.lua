@@ -13,7 +13,7 @@ while(recv_count < 50) do
   recv_count = recv_count + 1
   local nmea_info = nmea.getinfo(1)
   print("nmea_info=", nmea_info, "\r\n")
-  -- vmsleep(10)
+  vmsleep(1000)
 end
 
 
