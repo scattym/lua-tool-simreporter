@@ -32,7 +32,7 @@ while (true) do
           print(s)
             -- do stuff with line
         end
-        tcp.send_data("10.1.1.28", 5000, nmea_data)
+        tcp.send_data("theforeman.do.scattym.com", 65535, nmea_data)
         print(nmea_data);
         if (recv_count >= 100) then
           break;
