@@ -41,7 +41,7 @@ while (true) do
     end;
 end;
 nmea.close();
-gps.gpsclose();
+--gps.gpsclose();
 
 
 print(result)
