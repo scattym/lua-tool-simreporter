@@ -1,10 +1,10 @@
-require "chipsim"
-require "network"
-local socket = require("simsocket")
+--require "chipsim"
+--require "network"
+--local socket = require("simsocket")
 
 local _M = {}
 
-function check_network_dorm_function(app_handle)
+function check_and_enable_network(app_handle)
   print("check_network_dorm_function\r\n");
   network_state = {};
   network_state.invalid = 0;
@@ -17,16 +17,25 @@ function check_network_dorm_function(app_handle)
   network_state.null = 64;
   local status = network.status(app_handle);
   print("network status = ", status, "\r\n");
-  print("enter dormancy now...\r\n");
-  network.dorm(app_handle, true);
-  vmsleep(1000);
-  status = network.status(app_handle);
-  print("network status = ", status, "\r\n");
-  print("leave dormancy now...\r\n");
+  local safety_counter = 0;
+  while (status ~= network_state.up) do
+    if (status ~= network_state.resuming and status ~= network_state.coming_up) then
+      print("Trying to bring network up\r\n");
+      network.dorm(app_handle, false);
+    end;
+    vmsleep(1000);
+    status = network.status(app_handle)
+    print("network status = ", status, "\r\n");
+    if( safety_counter > 10 ) then
+      return false;
+    end;
+  end;
+  return true;
+end;
+
+function set_network_dormant(app_handle)
+  print("Setting network dormant")
   network.dorm(app_handle, false);
-  vmsleep(3000);
-  status = network.status(app_handle);
-  print("network status = ", status, "\r\n");
 end;
 
 function config_network_common_parameters()
@@ -42,29 +51,24 @@ function config_network_common_parameters()
   print("network.set_dns_timeout_param()=", result, "\r\n");
 end;
 
-printdir(1);
-
-collectgarbage();
-
 local make_http_post = function(host, url, data)
-  print("Host is " .. tostring(host))
-  print("URL is " .. tostring(url))
-  print("data is " .. tostring(data))
-  local http_req = ""
-  http_req = http_req .. "POST " .. tostring(url) .. " "
-  http_req = http_req .. "HTTP/1.1\r\nHost: "
-  http_req = http_req .. tostring(host)
-  http_req = http_req .. "\r\n"
-  http_req = http_req .. "User-Agent: Mozilla/5.0 (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n"
-  http_req = http_req .. "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n"
-  http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n"
-  http_req = http_req .. "Keep-Alive: 115\r\n"
-  http_req = http_req .. "Connection: keep-alive\r\n"
-  http_req = http_req .. "Content-Length: " .. string.len(tostring(data)) .. "\r\n"
+  print("Host is " .. tostring(host));
+  print("URL is " .. tostring(url));
+  print("data is " .. tostring(data));
+  local http_req = "";
+  http_req = http_req .. "POST " .. tostring(url) .. " ";
+  http_req = http_req .. "HTTP/1.1\r\nHost: ";
+  http_req = http_req .. tostring(host);
   http_req = http_req .. "\r\n";
-  http_req = http_req .. tostring(data)
+  http_req = http_req .. "User-Agent: Mozilla/5.0 (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
+  http_req = http_req .. "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n";
+  http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n";
+  http_req = http_req .. "Connection: close\r\n";
+  http_req = http_req .. "Content-Length: " .. string.len(tostring(data)) .. "\r\n";
+  http_req = http_req .. "\r\n";
+  http_req = http_req .. tostring(data);
   
-  return http_req 
+  return http_req;
 end
 
 
@@ -77,7 +81,7 @@ SOCK_RST_SOCK_FAILED and SOCK_RST_NETWORK_FAILED are fatal errors,
 when they happen, the socket cannot be used to transfer data further.
 
 ]]
-local send_data = function(host, port, data)
+local send_data = function(app_handle, host, port, data)
   
   SOCK_RST_OK = 0
   SOCK_RST_TIMEOUT = 1
@@ -87,22 +91,7 @@ local send_data = function(host, port, data)
   SOCK_RST_NETWORK_FAILED = 5
   
   local result;
-  
-  --Following is a sample of changing some common parameters, it is not required.
-  config_network_common_parameters();
-  
-  local server_address = "theforeman.do.scattym.com";
-  
-  print("opening network...\r\n");
-  local cid = 1;--0=>use setting of AT+CSOCKSETPN. 1-16=>use self defined cid
-  local timeout = 30000;--  '<= 0' means wait for ever; '> 0' is the timeout milliseconds
-  local app_handle = network.open(cid, timeout);--!!! If the PDP for cid is already opened by other app, this will return a reference to the same PDP context.
-  if (not app_handle) then
-    print("failed to open network\r\n");
-    return;
-  end;
-  print("network.open(), app_handle=", app_handle, "\r\n");
-  
+
   local local_ip_addr = network.local_ip(app_handle);
   print("local ip address is ", local_ip_addr, "\r\n");
   
@@ -110,17 +99,17 @@ local send_data = function(host, port, data)
   print("MTU is ", mtu_value, " bytes\r\n");
   
   --[[
-  
-  If the cid parameter is the same as the network.open(), the network.resolve() will use the same PDP activated using network.open(), 
-  
+
+  If the client_id parameter is the same as the network.open(), the network.resolve() will use the same PDP activated using network.open(), 
+
   or else the network.resolve() will activate new PDP context by itself.
-  
+
   ]]
   print("resolving DNS address...\r\n");
   local ip_address = network.resolve(host, cid);
   print("The IP address for ", server_address, " is ", ip_address, "\r\n");
   
-  check_network_dorm_function(app_handle);
+  check_and_enable_network(app_handle);
   
   SOCK_TCP = 0;
   SOCK_UDP = 1;
@@ -140,15 +129,15 @@ local send_data = function(host, port, data)
     print("connecting server...\r\n");
     local timeout = 30000;--  '<= 0' means wait for ever; '> 0' is the timeout milliseconds
     local connect_result, socket_released = socket.connect(socket_fd, ip_address, port, timeout);
-    --[[
-  
-    the socket_released indicates whether the socket handle has been released when failing to connect to the server.
-  
-    If socket_released is true, the socket.close() function needs not be called further. or else
-  
-    the socket.close() function still needs to be called to release the socket handle.
-  
-    ]]
+     --[[
+    
+     the socket_released indicates whether the socket handle has been released when failing to connect to the server.
+    
+     If socket_released is true, the socket.close() function needs not be called further. or else
+    
+     the socket.close() function still needs to be called to release the socket handle.
+    
+     ]]
     print("socket.connect = [result=", connect_result, ",socket_released=", socket_released, "]\r\n");
     if (not connect_result) then
       print("failed to connect server\r\n");
@@ -169,7 +158,7 @@ local send_data = function(host, port, data)
         print("socket.recv(), err_code=", err_code, "\r\n");
         if ((err_code == SOCK_RST_OK) and http_rsp) then
           if (printdir()) then
-            data = http_rsp;--this can print string larger than 1024 bytes, and also it can print string including '\0'.
+            os.printstr(http_rsp);--this can print string larger than 1024 bytes, and also it can print string including '\0'.
           end;
           print("\r\n");
         else
@@ -185,12 +174,49 @@ local send_data = function(host, port, data)
       print("close socket succeeded\r\n");
     end;
   end;
-  print("closing network...\r\n");
-  result = network.close(app_handle);
-  print("network.close(), result=", result, "\r\n");
 end
+_M.send_data = send_data;
 
-_M.send_data = send_data
+local close_network = function(app_handle)
+  set_network_dormant(app_handle);
+  print("closing network...\r\n");
+  local result = network.close(app_handle);
+  print("network.close(), result=", result, "\r\n");
+  return result;
+end;
+_M.close_network = close_network;
+
+local open_network = function(client_id)
+  --Following is a sample of changing some common parameters, it is not required.
+  --config_network_common_parameters();
+  
+  print("opening network...\r\n");
+  -- local cid = 1;--0=>use setting of AT+CSOCKSETPN. 1-16=>use self defined cid
+  local timeout = 30000;--  '<= 0' means wait for ever; '> 0' is the timeout milliseconds
+  local app_handle = network.open(client_id, timeout);--!!! If the PDP for cid is already opened by other app, this will return a reference to the same PDP context.
+  if (not app_handle) then
+    print("failed to open network\r\n");
+    return;
+  end;
+  print("network.open(), app_handle=", app_handle, "\r\n");
+  return app_handle;
+end;
+_M.open_network = open_network;
+
+local open_send_close_tcp = function(client_id, host, port, data)
+  app_handle = open_network(client_id)
+  if( app_handle ) then
+    result = send_data(app_handle, host, port, data);
+    close_network(app_handle);
+    return result;
+  else
+    print("Failed to open network");
+  end;
+  collectgarbage();
+  return false;
+end;
+
+_M.open_send_close_tcp = open_send_close_tcp;
 
 return _M
 
