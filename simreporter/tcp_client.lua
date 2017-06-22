@@ -98,7 +98,7 @@ local send_data = function(host, port, data)
   local timeout = 30000;--  '<= 0' means wait for ever; '> 0' is the timeout milliseconds
   local app_handle = network.open(cid, timeout);--!!! If the PDP for cid is already opened by other app, this will return a reference to the same PDP context.
   if (not app_handle) then
-    print("faield to open network\r\n");
+    print("failed to open network\r\n");
     return;
   end;
   print("network.open(), app_handle=", app_handle, "\r\n");
