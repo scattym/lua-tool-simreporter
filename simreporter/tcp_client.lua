@@ -205,6 +205,7 @@ _M.open_network = open_network;
 
 local open_send_close_tcp = function(client_id, host, port, data)
   app_handle = open_network(client_id)
+  print("App handle is " .. tostring(app_handle))
   if( app_handle ) then
     result = send_data(app_handle, host, port, data);
     close_network(app_handle);

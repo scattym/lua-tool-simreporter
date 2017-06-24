@@ -2,49 +2,54 @@
 --local nmea = require "nmea"
 --local thread = require "thread"
 local tcp = require "tcp_client"
+local encaps = require "encapsulation"
 --local nmea_event_handler = require "nmea_event_handler"
 --local gps_timer = require "gps_timer"
 
-NMEA_EVENT = 35
+local NMEA_EVENT = 35;
 
-local recv_count = 0
+local DEBUG = 1;
+local recv_count = 0;
+local GPS_LOCK_TIME = 60000;
+local NMEA_SLEEP_TIME = 1000;
+local REPORT_INTERVAL = 600000;
+local NMEA_LOOP_COUNT = 5;
+local MAIN_THREAD_SLEEP = 600000;
+local MAX_MAIN_THREAD_LOOP_COUNT = 999999;
 
-local encapsulate_nmea = function(nmea, iteration, count)
-  local before = "{ \"version\" : 1, "
-  before = before .. "\"nmea_number\" : " .. tostring(iteration) .. ", "
-  before = before .. "\"nmea_total\" : " .. tostring(count) .. ", "
-  print("Before is " .. before .. "\r\n")
-  local payload = "\"nmea\" : \"" .. tostring(nmea) .. "\" "
-  print("Payload is " .. payload .. "\r\n")
-  local after = "}"
-  print("After is " .. after .. "\r\n")
-  return before .. payload .. after
-end
+-- Drop intervals when in debug mode
+if( DEBUG ) then
+  GPS_LOCK_TIME = 40000;
+  NMEA_SLEEP_TIME = 3000;
+  REPORT_INTERVAL = 300000;
+  NMEA_LOOP_COUNT = 5;
+  MAIN_THREAD_SLEEP = 60000;
+  MAX_MAIN_THREAD_LOOP_COUNT = 10;
+end;
 
 function gps_tick()
   print("Starting gps tick function");
   while (true) do
     print("Turning gps on")
     gps.gpsstart(1);
-    thread.sleep(60000);
+    thread.sleep(GPS_LOCK_TIME);
     print("Requesting nmea data")
-    local loop = 5
-    for i=1,loop do
+    for i=1,NMEA_LOOP_COUNT do
       local nmea_data = nmea.getinfo(63);
       if (nmea_data) then
         print("nmea_data, len=", string.len(nmea_data), "\r\n");
-        local encapsulated_payload = encapsulate_nmea(nmea_data, i, loop)
+        local encapsulated_payload = encaps.encapsulate_nmea(nmea_data, i, NMEA_LOOP_COUNT)
         local client_id = 1;
         local result = tcp.open_send_close_tcp(client_id, "theforeman.do.scattym.com", 65535, encapsulated_payload);
         print("Result is ", tostring(result));
       end;
-      thread.sleep(1000);
+      thread.sleep(NMEA_SLEEP_TIME);
     end;
     print("Turning gps off");
     gps.gpsclose();
     print("Sleeping");
     collectgarbage();
-    thread.sleep(300000);
+    thread.sleep(REPORT_INTERVAL);
   end;
 end;
 
@@ -60,9 +65,9 @@ function start_threads()
   local counter = 0
   while (thread.running(gps_tick_thread)) do
     print("Still running");
-    thread.sleep(10000);
+    thread.sleep(MAIN_THREAD_SLEEP);
     counter = counter+1;
-    if( counter > 1000) then
+    if( counter > MAX_MAIN_THREAD_LOOP_COUNT) then
       thread.stop(gps_tick_thread);
       gps.gpsclose();
       break;
