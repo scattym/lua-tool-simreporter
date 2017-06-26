@@ -2,8 +2,9 @@
 
 local _M = {}
 
-local encapsulate_nmea = function(nmea, iteration, count)
+local encapsulate_nmea = function(device_info, nmea, iteration, count)
   local before = "{ \"version\" : 1, "
+  before = before .. "\"device_info\" : \"" .. tostring(device_info) .. "\", "
   before = before .. "\"nmea_number\" : " .. tostring(iteration) .. ", "
   before = before .. "\"nmea_total\" : " .. tostring(count) .. ", "
   print("Before is " .. before .. "\r\n")

@@ -1,16 +1,17 @@
 from atlib import *
 
 
-# module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
+module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
+# module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
 try:
     change_dir(module, "c:/")
     files = [
+        "ati_parser.lua",
         # "reporter.lua",
         "tcp_client.lua",
         "encapsulation.lua",
-        "nmea_getinfo.lua"
+        "nmea_getinfo.lua",
     ]
     stop_script(module)
     set_autorun(module, False)

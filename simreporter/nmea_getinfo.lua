@@ -5,6 +5,7 @@ local tcp = require "tcp_client"
 local encaps = require "encapsulation"
 --local nmea_event_handler = require "nmea_event_handler"
 --local gps_timer = require "gps_timer"
+local ati_parser = require "ati_parser"
 
 local NMEA_EVENT = 35;
 
@@ -20,12 +21,14 @@ local MAX_MAIN_THREAD_LOOP_COUNT = 999999;
 -- Drop intervals when in debug mode
 if( DEBUG ) then
   GPS_LOCK_TIME = 80000;
-  NMEA_SLEEP_TIME = 3000;
+  NMEA_SLEEP_TIME = 30000;
   REPORT_INTERVAL = 100000;
-  NMEA_LOOP_COUNT = 5;
+  NMEA_LOOP_COUNT = 50;
   MAIN_THREAD_SLEEP = 60000;
-  MAX_MAIN_THREAD_LOOP_COUNT = 30;
+  MAX_MAIN_THREAD_LOOP_COUNT = 40;
 end;
+
+local ati_string = ati_parser.get_device_info();
 
 function gps_tick()
   print("Starting gps tick function");
@@ -38,7 +41,7 @@ function gps_tick()
       local nmea_data = nmea.getinfo(63);
       if (nmea_data) then
         print("nmea_data, len=", string.len(nmea_data), "\r\n");
-        local encapsulated_payload = encaps.encapsulate_nmea(nmea_data, i, NMEA_LOOP_COUNT)
+        local encapsulated_payload = encaps.encapsulate_nmea(ati_string, nmea_data, i, NMEA_LOOP_COUNT)
         local client_id = 1;
         local result = tcp.open_send_close_tcp(client_id, "theforeman.do.scattym.com", 65535, encapsulated_payload);
         print("Result is ", tostring(result));
