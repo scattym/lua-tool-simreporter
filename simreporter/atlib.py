@@ -19,7 +19,7 @@ def put_file(serial_port, filename, file_contents):
     serial_port.write('AT+CFTRANRX="c:/%s",%i\r\n' %
                       (filename, len(file_contents)))
 
-    get_response(serial_port)
+    get_response(serial_port, 2)
 
     serial_port.write(file_contents)
     response = get_response(serial_port, 1)
@@ -79,3 +79,25 @@ def stop_script(serial_port, script):
 def read_all(serial_port):
     while True:
         get_response(serial_port, 5)
+
+
+def copy_file(serial_port, src, dest):
+    serial_port.write('AT+FSCOPY="%s","%s"\r\n' % (src, dest))
+    response = get_response(serial_port)
+    if not "OK" in response:
+        raise ValueError(response)
+
+
+def set_autorun(serial_port, on_flag=True):
+    on_off = "0"
+    if on_flag is True:
+        on_off = "1"
+    serial_port.write('AT+CSCRIPTAUTO=%s\r\n' % on_off)
+    response = get_response(serial_port)
+    if not "OK" in response:
+        raise ValueError(response)
+
+
+def stop_script(serial_port):
+    serial_port.write('AT+CSCRIPTSTOP\r\n')
+    response = get_response(serial_port)
