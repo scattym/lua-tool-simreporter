@@ -3,10 +3,11 @@ import time
 
 
 #module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-module = serial.serial_for_url("rfc2217://10.1.1.77:9990")
+module = serial.serial_for_url("rfc2217://10.1.1.77:9991", 115200, timeout=5)
 # module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
 try:
+    time.sleep(3)
     get_response(module)
     change_dir(module, "c:/")
     files = [

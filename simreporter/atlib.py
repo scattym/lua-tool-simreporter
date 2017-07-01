@@ -19,7 +19,9 @@ def put_file(serial_port, filename, file_contents):
     serial_port.write('AT+CFTRANRX="c:/%s",%i\r\n' %
                       (filename, len(file_contents)))
 
-    get_response(serial_port, 2)
+    response = get_response(serial_port)
+    if "CFTRANRX" not in response:
+        raise ValueError(response)
 
     serial_port.write(file_contents)
     response = get_response(serial_port, 1)
@@ -32,6 +34,7 @@ def put_file(serial_port, filename, file_contents):
 
 def change_dir(serial_port, directory):
     serial_port.write('AT+FSCD=%s\r\n' % directory)
+    time.sleep(1)
     response = get_response(serial_port)
     if not "OK" in response:
         raise ValueError(response)
