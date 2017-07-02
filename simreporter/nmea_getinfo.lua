@@ -20,64 +20,74 @@ local MAX_MAIN_THREAD_LOOP_COUNT = 999999;
 
 -- Drop intervals when in debug mode
 if( DEBUG ) then
-  GPS_LOCK_TIME = 80000;
-  NMEA_SLEEP_TIME = 30000;
-  REPORT_INTERVAL = 100000;
-  NMEA_LOOP_COUNT = 50;
-  MAIN_THREAD_SLEEP = 60000;
-  MAX_MAIN_THREAD_LOOP_COUNT = 40;
+    GPS_LOCK_TIME = 10000;
+    NMEA_SLEEP_TIME = 30000;
+    REPORT_INTERVAL = 100000;
+    NMEA_LOOP_COUNT = 50;
+    MAIN_THREAD_SLEEP = 60000;
+    MAX_MAIN_THREAD_LOOP_COUNT = 40;
 end;
 
 local ati_string = ati_parser.get_device_info();
 
 function gps_tick()
-  print("Starting gps tick function");
-  while (true) do
-    print("Turning gps on")
-    gps.gpsstart(1);
-    thread.sleep(GPS_LOCK_TIME);
-    print("Requesting nmea data")
-    for i=1,NMEA_LOOP_COUNT do
-      local nmea_data = nmea.getinfo(63);
-      if (nmea_data) then
-        print("nmea_data, len=", string.len(nmea_data), "\r\n");
-        local encapsulated_payload = encaps.encapsulate_nmea(ati_string, nmea_data, i, NMEA_LOOP_COUNT)
-        local client_id = 1;
-        local result = tcp.open_send_close_tcp(client_id, "theforeman.do.scattym.com", 65535, encapsulated_payload);
-        print("Result is ", tostring(result));
-      end;
-      thread.sleep(NMEA_SLEEP_TIME);
+    print("Starting gps tick function");
+    local client_id = 1;
+    while (true) do
+        print("Turning gps on")
+        gps.gpsstart(1);
+        thread.sleep(GPS_LOCK_TIME);
+        print("Requesting nmea data")
+        tcp.open_network(client_id)
+        for i=1,NMEA_LOOP_COUNT do
+            local cell_info = ati_parser.get_cell_info();
+            if (cell_info) then
+                print("cell_info, len=", string.len(cell_info), "\r\n");
+                local encapsulated_payload = encaps.encapsulate_data(ati_string, "cell_info", cell_info, i, NMEA_LOOP_COUNT);
+                local result = tcp.http_open_send_close(client_id, "theforeman.do.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
+                print("Result is ", tostring(result));
+            end;
+            local nmea_data = nmea.getinfo(63);
+            if (nmea_data) then
+                print("nmea_data, len=", string.len(nmea_data), "\r\n");
+                local encapsulated_payload = encaps.encapsulate_nmea(ati_string, "nmea", nmea_data, i, NMEA_LOOP_COUNT)
+
+                local result = tcp.http_open_send_close(client_id, "theforeman.do.scattym.com", 65535, "/process_update", encapsulated_payload);
+                print("Result is ", tostring(result));
+            end;
+            thread.sleep(NMEA_SLEEP_TIME);
+        end;
+        tcp.close_network(client_id)
+        print("Turning gps off");
+        gps.gpsclose();
+        print("Sleeping");
+        collectgarbage();
+        thread.sleep(REPORT_INTERVAL);
     end;
-    print("Turning gps off");
-    gps.gpsclose();
-    print("Sleeping");
-    collectgarbage();
-    thread.sleep(REPORT_INTERVAL);
-  end;
 end;
 
 function start_threads()
-  local gps_tick_thread = thread.create(gps_tick);
-  print(tostring(gps_tick_thread));
-  thread.sleep(1000);
-  print("Starting threads");
-  result = thread.run(gps_tick_thread);
-  print("Start thread result is " .. tostring(result));
+    local gps_tick_thread = thread.create(gps_tick);
+    print(tostring(gps_tick_thread));
+    thread.sleep(1000);
+    print("Starting threads");
+    result = thread.run(gps_tick_thread);
+    print("Start thread result is " .. tostring(result));
 
-  print("Threads are running");
-  local counter = 0
-  while (thread.running(gps_tick_thread)) do
-    print("Still running");
-    thread.sleep(MAIN_THREAD_SLEEP);
-    counter = counter+1;
-    if( counter > MAX_MAIN_THREAD_LOOP_COUNT) then
-      thread.stop(gps_tick_thread);
-      gps.gpsclose();
-      break;
+    print("Threads are running");
+    local counter = 0
+    while (thread.running(gps_tick_thread)) do
+        print("Still running");
+        thread.sleep(MAIN_THREAD_SLEEP);
+        counter = counter+1;
+        if( counter > MAX_MAIN_THREAD_LOOP_COUNT) then
+            thread.stop(gps_tick_thread);
+            gps.gpsclose();
+            break;
+        end;
+        collectgarbage();
     end;
-    collectgarbage();
-  end;
-  print("all sub-threads ended\r\n");
+    print("all sub-threads ended\r\n");
 end;
 
 printdir(1);

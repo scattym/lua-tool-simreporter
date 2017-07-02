@@ -18,6 +18,8 @@ try:
         "nmea_getinfo.lua",
     ]
     stop_script(module)
+    while(script_is_running(module)):
+        print "Script still running"
     set_autorun(module, False)
     for file in files:  # os.listdir("."):
         if os.path.isfile(file):
@@ -41,8 +43,17 @@ try:
     # compile_file(module, "reporter.lua")
     ls(module)
 
-    # run_script(module, "reporter.out")
-    copy_file(module, "nmea_getinfo.out", "autorun.out")
+    run_script(module, "reporter.out")
+    stop_script(module)
+    while(script_is_running(module)):
+        print "Script still running"
+    try:
+        run_script(module, "nmea_getinfo.out")
+    except ValueError as error:
+        get_response(module, 2)
+        get_response(module, 2)
+        run_script(module, "nmea_getinfo.out")
+    #copy_file(module, "nmea_getinfo.out", "autorun.out")
 
     set_autorun(module, True)
 

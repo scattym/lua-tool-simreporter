@@ -45,7 +45,7 @@ def compile_file(serial_port, filename):
 
     serial_port.write('AT+CSCRIPTCL="c:/%s"\r\n' % filename)
     response = get_response(serial_port, 2)
-    if not "OK" in response:
+    if "ERROR" in response:
         raise ValueError(response)
 
 
@@ -54,7 +54,7 @@ def delete_file(serial_port, filename):
     # get_response(serial_port)
     serial_port.write('AT+FSDEL="%s"\r\n' % filename)
     response = get_response(serial_port)
-    if not "OK" in response:
+    if response == "":
         raise ValueError(response)
     # serial_port.write("ATE1\r\n")
     # get_response(serial_port)
@@ -75,8 +75,18 @@ def run_script(serial_port, script):
 def stop_script(serial_port, script):
     serial_port.write('AT+CSCRIPTSTOP="%s"\r\n' % script)
     response = get_response(serial_port)
-    if not "OK" in response:
+    if response == "":
         raise ValueError(response)
+
+
+def script_is_running(serial_port):
+    serial_port.write('AT+CSCRIPTSTOP?\r\n')
+    response = get_response(serial_port)
+    if response == "":
+        raise ValueError(response)
+    if "+CSCRIPTSTOP:" in response:
+        return True
+    return False
 
 
 def read_all(serial_port):
