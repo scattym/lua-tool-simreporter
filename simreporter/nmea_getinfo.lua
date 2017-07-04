@@ -1,6 +1,8 @@
 --local gps = require "gps"
 --local nmea = require "nmea"
 --local thread = require "thread"
+collectgarbage();
+
 local tcp = require "tcp_client"
 local encaps = require "encapsulation"
 --local nmea_event_handler = require "nmea_event_handler"
@@ -40,13 +42,22 @@ function gps_tick()
         print("Requesting nmea data")
         tcp.open_network(client_id)
         for i=1,NMEA_LOOP_COUNT do
-            local cell_info = ati_parser.get_cell_info();
-            if (cell_info) then
-                print("cell_info, len=", string.len(cell_info), "\r\n");
-                local encapsulated_payload = encaps.encapsulate_data(ati_string, "cell_info", cell_info, i, NMEA_LOOP_COUNT);
-                local result = tcp.http_open_send_close(client_id, "theforeman.do.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
-                print("Result is ", tostring(result));
-            end;
+            local cell_table = {}
+            cell_table["cpsi"] = ati_parser.get_cpsi();
+            cell_table["cell_info"] = ati_parser.get_cell_info();
+            cell_table["cbc"] = ati_parser.get_cbc();
+            cell_table["cclk"] = ati_parser.get_cclk();
+            cell_table["cgsn"] = ati_parser.get_cgsn();
+            cell_table["cgmi"] = ati_parser.get_cgmi();
+            cell_table["cgmm"] = ati_parser.get_cgmm();
+            cell_table["cgmr"] = ati_parser.get_cgmr();
+            cell_table["cops"] = ati_parser.get_cops();
+            cell_table["osclock"] = os.clock();
+            -- print("cpsi, len=", string.len(cell_table["cpsi"]), "\r\n");
+            -- print("cell_info, len=", string.len(cell_table["cell_info"]), "\r\n");
+            local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, NMEA_LOOP_COUNT);
+            local result = tcp.http_open_send_close(client_id, "theforeman.do.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
+            print("Result is ", tostring(result));
             local nmea_data = nmea.getinfo(63);
             if (nmea_data) then
                 print("nmea_data, len=", string.len(nmea_data), "\r\n");
@@ -91,6 +102,7 @@ function start_threads()
 end;
 
 printdir(1);
+vmsleep(15000);
 
 thread_list = thread.list()
 print("Thread list is " .. tostring(thread_list))

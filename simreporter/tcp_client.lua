@@ -125,7 +125,7 @@ local send_data = function(client_id, host, port, data)
   ]]
     print("resolving DNS address...\r\n");
     local ip_address = network.resolve(host, cid);
-    print("The IP address for ", server_address, " is ", ip_address, "\r\n");
+    print("The IP address for ", host, " is ", ip_address, "\r\n");
 
     check_and_enable_network(app_handle);
 
