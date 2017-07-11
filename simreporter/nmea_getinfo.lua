@@ -7,7 +7,8 @@ local tcp = require "tcp_client"
 local encaps = require "encapsulation"
 --local nmea_event_handler = require "nmea_event_handler"
 --local gps_timer = require "gps_timer"
-local ati_parser = require "ati_parser"
+local at = require "at_commands"
+local network_setup = require "network_setup"
 
 local NMEA_EVENT = 35;
 
@@ -30,7 +31,7 @@ if( DEBUG ) then
     MAX_MAIN_THREAD_LOOP_COUNT = 40;
 end;
 
-local ati_string = ati_parser.get_device_info();
+local ati_string = at.get_device_info();
 
 function gps_tick()
     print("Starting gps tick function");
@@ -43,27 +44,30 @@ function gps_tick()
         tcp.open_network(client_id)
         for i=1,NMEA_LOOP_COUNT do
             local cell_table = {}
-            cell_table["cpsi"] = ati_parser.get_cpsi();
-            cell_table["cell_info"] = ati_parser.get_cell_info();
-            cell_table["cbc"] = ati_parser.get_cbc();
-            cell_table["cclk"] = ati_parser.get_cclk();
-            cell_table["cgsn"] = ati_parser.get_cgsn();
-            cell_table["cgmi"] = ati_parser.get_cgmi();
-            cell_table["cgmm"] = ati_parser.get_cgmm();
-            cell_table["cgmr"] = ati_parser.get_cgmr();
-            cell_table["cops"] = ati_parser.get_cops();
+            cell_table["cpsi"] = at.get_cpsi();
+            cell_table["cell_info"] = at.get_cell_info();
+            cell_table["cbc"] = at.get_cbc();
+            cell_table["cclk"] = at.get_cclk();
+            cell_table["cgsn"] = at.get_cgsn();
+            cell_table["cgmi"] = at.get_cgmi();
+            cell_table["cgmm"] = at.get_cgmm();
+            cell_table["cgmr"] = at.get_cgmr();
+            cell_table["cops"] = at.get_cops();
+            cell_table["ciccid"] = at.get_ciccid();
+            cell_table["cspn"] = at.get_cspn();
+            cell_table["cimi"] = at.get_cimi();
             cell_table["osclock"] = os.clock();
             -- print("cpsi, len=", string.len(cell_table["cpsi"]), "\r\n");
             -- print("cell_info, len=", string.len(cell_table["cell_info"]), "\r\n");
             local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, NMEA_LOOP_COUNT);
-            local result = tcp.http_open_send_close(client_id, "theforeman.do.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
+            local result = tcp.http_open_send_close(client_id, "services.do.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
             print("Result is ", tostring(result));
             local nmea_data = nmea.getinfo(63);
             if (nmea_data) then
                 print("nmea_data, len=", string.len(nmea_data), "\r\n");
                 local encapsulated_payload = encaps.encapsulate_nmea(ati_string, "nmea", nmea_data, i, NMEA_LOOP_COUNT)
 
-                local result = tcp.http_open_send_close(client_id, "theforeman.do.scattym.com", 65535, "/process_update", encapsulated_payload);
+                local result = tcp.http_open_send_close(client_id, "services.do.scattym.com", 65535, "/process_update", encapsulated_payload);
                 print("Result is ", tostring(result));
             end;
             thread.sleep(NMEA_SLEEP_TIME);
@@ -102,6 +106,7 @@ function start_threads()
 end;
 
 printdir(1);
+network_setup.set_network_from_sms_operator()
 vmsleep(15000);
 
 thread_list = thread.list()

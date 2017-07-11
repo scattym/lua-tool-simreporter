@@ -91,5 +91,40 @@ local get_cgmr = function()
 end;
 _M.get_cgmr = get_cgmr
 
+-- +CSPN: "YES OPTUS",1
+local get_cspn = function()
+    response = run_command("AT+CSPN?");
+    return response;
+end;
+_M.get_cspn = get_cspn
+
+-- +ICCID: 8961025816454955613F
+local get_ciccid = function()
+    response = run_command("AT+CICCID");
+    return response;
+end;
+_M.get_ciccid = get_ciccid
+
+-- AT+CIMI
+-- 505025806420285
+local get_cimi = function()
+    response = run_command("AT+CIMI");
+    return response;
+end;
+_M.get_cimi = get_cimi
+
+-- AT+CGSOCKCONT=1,"IP","yesinternet","0.0.0.0",0,0
+local set_cgsockcont = function(data)
+    response = run_command("AT+CGSOCKCONT=" .. data);
+    return response;
+end;
+_M.set_cgsockcont = set_cgsockcont
+
+-- AT+CGDCONT=1,"IP","yesinternet","0.0.0.0",0,0
+local set_cgdcont = function(data)
+    response = run_command("AT+CGDCONT=" .. data);
+    return response;
+end;
+_M.set_cgdcont = set_cgdcont
 
 return _M

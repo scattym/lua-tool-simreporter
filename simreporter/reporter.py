@@ -3,19 +3,22 @@ import time
 
 
 #module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-module = serial.serial_for_url("rfc2217://10.1.1.5:9991", 115200, timeout=5)
+module = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
 # module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
 try:
     get_response(module)
     change_dir(module, "c:/")
     files = [
-        "ati_parser.lua",
-        "canary.lua",
-        "reporter.lua",
-        "tcp_client.lua",
-        "encapsulation.lua",
-        "nmea_getinfo.lua",
+        "at_abs.lua",
+        #         "at_commands.lua",
+        #         "canary.lua",
+        #         "network_setup.lua",
+        #         "reporter.lua",
+        #         "tcp_client.lua",
+        #         "encapsulation.lua",
+        #         "nmea_getinfo.lua",
+        #         "util.lua",
     ]
     stop_script(module)
     while(script_is_running(module)):
