@@ -23,12 +23,12 @@ local MAX_MAIN_THREAD_LOOP_COUNT = 999999;
 
 -- Drop intervals when in debug mode
 if( DEBUG ) then
-    GPS_LOCK_TIME = 10000;
+    GPS_LOCK_TIME = 120000;
     NMEA_SLEEP_TIME = 30000;
-    REPORT_INTERVAL = 100000;
-    NMEA_LOOP_COUNT = 50;
-    MAIN_THREAD_SLEEP = 60000;
-    MAX_MAIN_THREAD_LOOP_COUNT = 40;
+    REPORT_INTERVAL = 600000;
+    NMEA_LOOP_COUNT = 3;
+    MAIN_THREAD_SLEEP = 1200000;
+    MAX_MAIN_THREAD_LOOP_COUNT = 999999;
 end;
 
 local ati_string = at.get_device_info();

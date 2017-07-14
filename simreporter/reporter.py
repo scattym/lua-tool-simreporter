@@ -3,22 +3,22 @@ import time
 
 
 #module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-module = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
-# module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
+#module = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
+module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
 try:
     get_response(module)
     change_dir(module, "c:/")
     files = [
         "at_abs.lua",
-        #         "at_commands.lua",
-        #         "canary.lua",
-        #         "network_setup.lua",
-        #         "reporter.lua",
-        #         "tcp_client.lua",
-        #         "encapsulation.lua",
-        #         "nmea_getinfo.lua",
-        #         "util.lua",
+        "at_commands.lua",
+        #"canary.lua",
+        "network_setup.lua",
+        "reporter.lua",
+        "tcp_client.lua",
+        "encapsulation.lua",
+        "nmea_getinfo.lua",
+        "util.lua",
     ]
     stop_script(module)
     while(script_is_running(module)):
@@ -40,8 +40,8 @@ try:
     for file in files:  # os.listdir("."):
         compile_file(module, file)
 
-    # for file in files:  # os.listdir("."):
-    #    delete_file(module, file)
+    for file in files:  # os.listdir("."):
+        delete_file(module, file)
 
     delete_file(module, "autorun.out")
 
@@ -64,8 +64,8 @@ try:
 
     set_autorun(module, True)
 
-    run_script(module, "canary.out")
-    stop_script(module)
+    #run_script(module, "canary.out")
+    # stop_script(module)
     while(script_is_running(module)):
         print "Script still running"
     run_script(module, "nmea_getinfo.out")
