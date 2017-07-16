@@ -4,8 +4,8 @@ from __builtin__ import file
 
 
 #module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-module = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
-# module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
+#module = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
+module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
 import os
 
@@ -67,8 +67,8 @@ try:
     for file in compile_files:  # os.listdir("."):
         compile_file(module, file)
 
-    # for file in files:  # os.listdir("."):
-    #    delete_file(module, file)
+    for file in files:  # os.listdir("."):
+        delete_file(module, file)
 
     if "nmea_getinfo.lua" in compile_files:
         delete_file(module, "autorun.out")
