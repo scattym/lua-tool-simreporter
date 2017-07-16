@@ -113,3 +113,8 @@ def set_autorun(serial_port, on_flag=True):
 def stop_script(serial_port):
     serial_port.write('AT+CSCRIPTSTOP\r\n')
     response = get_response(serial_port)
+
+
+def reset(serial_port):
+    serial_port.write('AT+CRESET\r\n')
+    response = get_response(serial_port)

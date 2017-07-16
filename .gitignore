@@ -1,2 +1,4 @@
 *.pyc
 simreporter/*.pyc
+simreporter/lastupload/*
+.idea

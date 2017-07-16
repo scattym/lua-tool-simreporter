@@ -16,9 +16,9 @@ local add_field = function(data, key, value, type)
         return_str = string.format("%s\"%s\"", return_str, value_str:gsub("\r\n", "|"):gsub('"', '\\"'))
     end;
 
-    print("return string is:")
-    print(return_str)
-    print("\r\n")
+    --print("return string is:")
+    --print(return_str)
+    --print("\r\n")
     return return_str;
 end;
 
@@ -43,11 +43,11 @@ local encapsulate_nmea = function(device_info, key, data, iteration, count)
     before = before .. "\"device_info\" : \"" .. tostring(device_info) .. "\", "
     before = before .. "\"nmea_number\" : " .. tostring(iteration) .. ", "
     before = before .. "\"nmea_total\" : " .. tostring(count) .. ", "
-    print("Before is " .. before .. "\r\n")
+    --print("Before is " .. before .. "\r\n")
     local payload = "\"" .. key .."\" : \"" .. tostring(data) .. "\" "
-    print("Payload is " .. payload .. "\r\n")
+    --print("Payload is " .. payload .. "\r\n")
     local after = "}"
-    print("After is " .. after .. "\r\n")
+    --print("After is " .. after .. "\r\n")
     return before .. payload .. after
 end
 

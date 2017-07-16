@@ -9,90 +9,164 @@ local encaps = require "encapsulation"
 --local gps_timer = require "gps_timer"
 local at = require "at_commands"
 local network_setup = require "network_setup"
+local at_abs = require "at_abs"
+local device = require "device"
 
 local NMEA_EVENT = 35;
 
-local DEBUG = 1;
+local DEBUG = true;
 local recv_count = 0;
-local GPS_LOCK_TIME = 60000;
-local NMEA_SLEEP_TIME = 1000;
-local REPORT_INTERVAL = 600000;
-local NMEA_LOOP_COUNT = 5;
+--local GPS_LOCK_TIME = 60000;
+local NMEA_SLEEP_TIME = 30000;
+local REPORT_INTERVAL = 3600000;
+local NMEA_LOOP_COUNT = 3;
 local MAIN_THREAD_SLEEP = 600000;
-local MAX_MAIN_THREAD_LOOP_COUNT = 999999;
+local MAX_MAIN_THREAD_LOOP_COUNT = 9999999;
+local GPS_LOCK_CHECK_SLEEP_TIME = 20000;
+local GPS_LOCK_CHECK_MAX_LOOP = 2000;
 
 -- Drop intervals when in debug mode
 if( DEBUG ) then
-    GPS_LOCK_TIME = 10000;
+    --GPS_LOCK_TIME = 10000;
     NMEA_SLEEP_TIME = 30000;
-    REPORT_INTERVAL = 100000;
-    NMEA_LOOP_COUNT = 50;
+    REPORT_INTERVAL = 300000;
+    NMEA_LOOP_COUNT = 2;
     MAIN_THREAD_SLEEP = 60000;
     MAX_MAIN_THREAD_LOOP_COUNT = 40;
 end;
 
+CELL_THREAD_SLEEP_TIME = REPORT_INTERVAL * 2;
+local MIN_REPORT_TIME = (CELL_THREAD_SLEEP_TIME / 1000) - 5;
+--- MIN_REPORT_TIME = MIN_REPORT_TIME * 1000;
+
 local ati_string = at.get_device_info();
+local last_cell_report = 0;
+
+function update_last_cell_report()
+    thread.enter_cs(2);
+    last_cell_report = os.clock();
+    thread.leave_cs(2);
+end;
+
+function last_cell_report_has_expired()
+    thread.enter_cs(2);
+    local copy_of_last_cell_report = last_cell_report;
+    thread.leave_cs(2);
+    local now = os.clock();
+    local time_since_last_report = now - copy_of_last_cell_report;
+    print("Now is: ", tostring(now), " last reported time is: ", tostring(copy_of_last_cell_report), " difference is: ", tostring(time_since_last_report), "\r\n");
+    print("Difference is: ", tostring(time_since_last_report), ", min report time is: ", tostring(MIN_REPORT_TIME), "\r\n");
+    if copy_of_last_cell_report == 0 or time_since_last_report > MIN_REPORT_TIME then
+        return true;
+    else
+        return false;
+    end;
+    
+end;
+    
+    
+function wait_until_lock(iterations)
+    local gps_info = nil
+    for i=1,iterations do
+        local is_locked = at_abs.is_location_valid();
+        if is_locked then
+            print("GPS locked. Exiting wait.\r\n");
+            return true
+        end
+        print("Not locked yet. Sleeping\r\n");
+        thread.sleep(GPS_LOCK_CHECK_SLEEP_TIME);
+    end
+    print("GPS iterations exceeded. Exiting wait.\r\n");
+    return false
+end
 
 function gps_tick()
-    print("Starting gps tick function");
+    print("Starting gps tick function\r\n");
     local client_id = 1;
     while (true) do
-        print("Turning gps on")
+        print("GPS data thread waking up\r\n");
+        print("Turning gps on\r\n");
         gps.gpsstart(1);
-        thread.sleep(GPS_LOCK_TIME);
-        print("Requesting nmea data")
-        tcp.open_network(client_id)
+        local gps_locked = wait_until_lock(GPS_LOCK_CHECK_MAX_LOOP);
+        --thread.sleep(GPS_LOCK_TIME);
+        print("Requesting nmea data\r\n");
+        local open_net_result = tcp.open_network(client_id);
+        print("Open network response is: ", open_net_result, "\r\n");
         for i=1,NMEA_LOOP_COUNT do
-            local cell_table = {}
-            cell_table["cpsi"] = at.get_cpsi();
-            cell_table["cell_info"] = at.get_cell_info();
-            cell_table["cbc"] = at.get_cbc();
-            cell_table["cclk"] = at.get_cclk();
-            cell_table["cgsn"] = at.get_cgsn();
-            cell_table["cgmi"] = at.get_cgmi();
-            cell_table["cgmm"] = at.get_cgmm();
-            cell_table["cgmr"] = at.get_cgmr();
-            cell_table["cops"] = at.get_cops();
-            cell_table["ciccid"] = at.get_ciccid();
-            cell_table["cspn"] = at.get_cspn();
-            cell_table["cimi"] = at.get_cimi();
-            cell_table["osclock"] = os.clock();
-            -- print("cpsi, len=", string.len(cell_table["cpsi"]), "\r\n");
-            -- print("cell_info, len=", string.len(cell_table["cell_info"]), "\r\n");
+
+            local cell_table = device.get_device_info_table();
             local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, NMEA_LOOP_COUNT);
             local result = tcp.http_open_send_close(client_id, "services.do.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
-            print("Result is ", tostring(result));
+            if result then
+                update_last_cell_report();
+            end;
+            print("Result is ", tostring(result), "\r\n");
+
             local nmea_data = nmea.getinfo(63);
             if (nmea_data) then
                 print("nmea_data, len=", string.len(nmea_data), "\r\n");
-                local encapsulated_payload = encaps.encapsulate_nmea(ati_string, "nmea", nmea_data, i, NMEA_LOOP_COUNT)
+                local encapsulated_payload = encaps.encapsulate_nmea(ati_string, "nmea", nmea_data, i, NMEA_LOOP_COUNT);
 
                 local result = tcp.http_open_send_close(client_id, "services.do.scattym.com", 65535, "/process_update", encapsulated_payload);
-                print("Result is ", tostring(result));
+                print("Result is ", tostring(result), "\r\n");
             end;
+            collectgarbage();
             thread.sleep(NMEA_SLEEP_TIME);
         end;
-        tcp.close_network(client_id)
-        print("Turning gps off");
+        tcp.close_network(client_id);
+        print("Turning gps off\r\n");
         gps.gpsclose();
-        print("Sleeping");
+        print("Sleeping\r\n");
+        print("GPS data thread sleeping for ", REPORT_INTERVAL / 1000, " seconds\r\n");
         collectgarbage();
         thread.sleep(REPORT_INTERVAL);
     end;
 end;
 
+function cell_tick()
+    print("Starting cell data tick function\r\n");
+    local client_id = 2;
+    while (true) do
+        print("Cell data thread waking up\r\n");
+        if last_cell_report_has_expired() then
+            tcp.open_network(client_id);
+            for i=1,1 do
+                local cell_table = device.get_device_info_table();
+                local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, NMEA_LOOP_COUNT);
+                local result = tcp.http_open_send_close(client_id, "services.do.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
+                print("Result is ", tostring(result), "\r\n");
+                if result then
+                    update_last_cell_report();
+                end;
+                collectgarbage();
+                thread.sleep(NMEA_SLEEP_TIME);
+            end;
+            tcp.close_network(client_id);
+        else
+            print("Cell data has already been reported at ", tostring(last_cell_report), "\r\n");
+        end
+        print("Cell data thread sleeping for ", CELL_THREAD_SLEEP_TIME / 1000, " seconds\r\n");
+        collectgarbage();
+        thread.sleep(CELL_THREAD_SLEEP_TIME);
+    end;
+end;
+
 function start_threads()
     local gps_tick_thread = thread.create(gps_tick);
-    print(tostring(gps_tick_thread));
+    local cell_tick_thread = thread.create(cell_tick);
+    print(tostring(gps_tick_thread), "\r\n");
+    print(tostring(cell_tick_thread), "\r\n");
     thread.sleep(1000);
-    print("Starting threads");
+    print("Starting threads\r\n");
     result = thread.run(gps_tick_thread);
-    print("Start thread result is " .. tostring(result));
+    print("GPS start thread result is ", tostring(result), "\r\n");
+    result = thread.run(cell_tick_thread);
+    print("Cell data start thread result is ", tostring(result), "\r\n");
 
-    print("Threads are running");
+    print("Threads are running\r\n");
     local counter = 0
-    while (thread.running(gps_tick_thread)) do
-        print("Still running");
+    while (thread.running(gps_tick_thread) or thread.running(cell_tick_thread)) do
+        print("Still running\r\n");
         thread.sleep(MAIN_THREAD_SLEEP);
         counter = counter+1;
         if( counter > MAX_MAIN_THREAD_LOOP_COUNT) then
@@ -106,11 +180,12 @@ function start_threads()
 end;
 
 printdir(1);
-network_setup.set_network_from_sms_operator()
+vmsleep(10000);
+network_setup.set_network_from_sms_operator();
 vmsleep(15000);
 
 thread_list = thread.list()
-print("Thread list is " .. tostring(thread_list))
+print("Thread list is ", tostring(thread_list), "\r\n")
 
 main_id = thread.identity();
 print("main_id=", main_id, "\r\n");
@@ -120,4 +195,4 @@ start_threads();
 
 print("exit main thread\r\n");
 
-print(result)
+print(result);

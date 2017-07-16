@@ -2,24 +2,28 @@
 local _M = {}
 
 local run_command = function(cmd)
+    print("Thread entering critical section\r\n");
+    thread.enter_cs(1);
+    print("Thread in critical section\r\n");
     local echo_off = "ATE0\r\n"
     local echo_on = "ATE1\r\n"
     sio.send(echo_off)
     --receive response with 5000 ms time out
     rsp = sio.recv(5000)
-    print(rsp)
 
     --clear sio recv cache
     sio.clear()
+    --print(cmd .. "\r\n")
     sio.send(cmd .. "\r\n")
     --receive response with 5000 ms time out
     return_string = sio.recv(5000)
-    print(rsp)
+    print(rsp, "\r\n")
 
     sio.send(echo_on)
     --receive response with 5000 ms time out
     rsp = sio.recv(5000)
-    print(rsp)
+    thread.leave_cs(1);
+    print("Thread out of critical section\r\n");
 
     return return_string;
 end;
@@ -126,5 +130,44 @@ local set_cgdcont = function(data)
     return response;
 end;
 _M.set_cgdcont = set_cgdcont
+
+-- AT+COPS=?
+-- +COPS: (2,"YES OPTUS","OPTUS","50502",7),(1,"Optus AU","Optus","50502",2),(1,"Optus AU","Optus","50502",0),(3,"Telstra Mobile","Telstra","50501",7),(3,"vodafone AU","voda AU","50503",0),(3,"vodafone AU","voda AU","50503",2),(3,"vodafone AU","voda AU","50503",7),,(0,1,2,3,4,5),(0,1,2)
+-- AT+COPS=0,2,50502
+local set_cops = function(data)
+    response = run_command("AT+COPS=" .. data);
+    return response;
+end;
+_M.set_cops = set_cops
+
+-- AT+CGPSINFO
+-- +CGPSINFO:3348.946584,S,15112.011722,E,150717,023133.4,90.4,0.0,0
+-- AmpI/AmpQ: 443/434
+-- OK
+local get_cgpsinfo = function()
+    response = run_command("AT+CGPSINFO");
+    return response;
+end;
+_M.get_cgpsinfo = get_cgpsinfo
+
+--AT+CGDCONT?
+--+CGDCONT: 1,"IP","","0.0.0.0",0,0
+--OK
+local get_cgdcont = function()
+    response = run_command("AT+CGDCONT?");
+    return response;
+end;
+_M.get_cgdcont = get_cgdcont
+
+
+--AT+CGSOCKCONT?
+--+CGSOCKCONT: 1,"IP","telstra.wap","0.0.0.0",0,0
+--+CGSOCKCONT: 2,"IP","","0.0.0.0",0,0
+--+CGSOCKCONT: 3,"IP","","0.0.0.0",0,0
+local get_cgsockcont = function()
+    response = run_command("AT+CGSOCKCONT?");
+    return response;
+end;
+_M.get_cgsockcont = get_cgsockcont
 
 return _M
