@@ -36,7 +36,8 @@ end;
 
 local set_gdcont_if_incorrect = function(sim_operator)
     local apn = at_abs.get_data_apn();
-    if string.match(sim_operator, "Telstra") then
+    local sim_lower = string.lower(sim_operator);
+    if string.match(sim_lower, "telstra") then
         if string.match(apn,"telstra.internet") then
             print("Data APN already set to telstra.internet for operator ", sim_operator, "\r\n");
             
@@ -46,13 +47,22 @@ local set_gdcont_if_incorrect = function(sim_operator)
                 at.set_cgdcont(i .. ',"IP","telstra.internet","0.0.0.0",0,0');
             end;
         end;
-    elseif string.match(sim_operator,"OPTUS") then
+    elseif string.match(sim_lower,"optus") then
         if string.match(apn,"yesinternet") then
             print("Data APN already set to yesinternet for operator ", sim_operator, "\r\n");
         else
             print("Setting data APN to yesinternet\r\n");
             for i = 1,16 do
                 at.set_cgdcont(i .. ',"IP","yesinternet","0.0.0.0",0,0');
+            end;
+        end;
+    elseif string.match(sim_lower,"dtac") then
+        if string.match(apn,"www.dtac.co.th") then
+            print("Data APN already set to www.dtac.co.th for operator ", sim_operator, "\r\n");
+        else
+            print("Setting data APN to www.dtac.co.th\r\n");
+            for i = 1,16 do
+                at.set_cgdcont(i .. ',"IP","www.dtac.co.th","0.0.0.0",0,0');
             end;
         end;
     else
@@ -70,7 +80,8 @@ end;
 
 local set_gsockcont_if_incorrect = function(sim_operator)
     local apn = at_abs.get_sock_apn();
-    if string.match(sim_operator, "Telstra") then
+    local sim_lower = string.lower(sim_operator);
+    if string.match(sim_lower, "telstra") then
         if string.match(apn,"telstra.internet") then
             print("Socket APN already set to telstra.internet for operator ", sim_operator, "\r\n");
             
@@ -80,7 +91,7 @@ local set_gsockcont_if_incorrect = function(sim_operator)
                 at.set_cgsockcont(i .. ',"IP","telstra.internet","0.0.0.0",0,0');
             end;
         end;
-    elseif string.match(sim_operator,"OPTUS") then
+    elseif string.match(sim_lower,"optus") then
         if string.match(apn,"yesinternet") then
             print("Socket APN already set to yesinternet for operator ", sim_operator, "\r\n");
         else
@@ -89,8 +100,17 @@ local set_gsockcont_if_incorrect = function(sim_operator)
                 at.set_cgsockcont(i .. ',"IP","yesinternet","0.0.0.0",0,0');
             end;
         end;
+    elseif string.match(sim_lower,"dtac") then
+        if string.match(apn,"www.dtac.co.th") then
+            print("Socket APN already set to www.dtac.co.th for operator ", sim_operator, "\r\n");
+        else
+            print("Setting socket APN to www.dtac.co.th\r\n");
+            for i = 1,16 do
+                at.set_cgsockcont(i .. ',"IP","www.dtac.co.th","0.0.0.0",0,0');
+            end;
+        end;
     else
-        if string.match(apn,"internet") then
+        if string.match(apn,"\"internet\"") then
             print("Socket APN already set to internet for operator ", sim_operator, "\r\n");
         else
             print("Setting socket APN to internet\r\n");
@@ -105,7 +125,7 @@ end;
 local set_network_from_sms_operator = function()
     local sim_operator = at_abs.get_sim_operator();
     print("sim operator is ", tostring(sim_operator), "\r\n");
-    set_operator_if_incorrect(sim_operator);
+    -- set_operator_if_incorrect(sim_operator);
     set_gdcont_if_incorrect(sim_operator);
     set_gsockcont_if_incorrect(sim_operator);
 end

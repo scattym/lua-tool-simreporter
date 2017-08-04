@@ -4,7 +4,7 @@ from __builtin__ import file
 
 
 #module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-module = serial.serial_for_url("rfc2217://pi:9990", 115200, timeout=5)
+module = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
 #module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
 import os
@@ -27,6 +27,7 @@ def file_is_newer_than(file1, file2):
 try:
     get_response(module)
     change_dir(module, "c:/")
+    set_autorun(module, False)
     files = [
         "at_abs.lua",
         "at_commands.lua",
@@ -41,9 +42,21 @@ try:
     ]
     compile_files = []
     stop_script(module)
+    counter = 0
     while(script_is_running(module)):
         print "Script still running"
-    set_autorun(module, False)
+        counter += 1
+        if counter > 30:
+            print "Script not stopping, resetting module."
+            reset(module)
+            response = get_response(module, 2)
+            while("PB DONE" not in response and "CME_ERROR" not in response):
+                print("Waiting for module to start.")
+                response = get_response(module, 2)
+            sleep(5)
+            print("Module now ready.")
+            break
+
     for file in files:  # os.listdir("."):
         if os.path.isfile(file):
             if "lua" in file:
