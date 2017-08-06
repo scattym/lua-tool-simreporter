@@ -56,6 +56,15 @@ local set_gdcont_if_incorrect = function(sim_operator)
                 at.set_cgdcont(i .. ',"IP","yesinternet","0.0.0.0",0,0');
             end;
         end;
+    elseif string.match(sim_lower,"voda") then
+        if string.match(apn," live.vodafone.com") then
+            print("Data APN already set to  live.vodafone.com for operator ", sim_operator, "\r\n");
+        else
+            print("Setting data APN to  live.vodafone.com\r\n");
+            for i = 1,16 do
+                at.set_cgdcont(i .. ',"IP","  live.vodafone.com","0.0.0.0",0,0');
+            end;
+        end;
     elseif string.match(sim_lower,"dtac") then
         if string.match(apn,"www.dtac.co.th") then
             print("Data APN already set to www.dtac.co.th for operator ", sim_operator, "\r\n");
@@ -98,6 +107,15 @@ local set_gsockcont_if_incorrect = function(sim_operator)
             print("Setting socket APN to yesinternet\r\n");
             for i = 1,16 do
                 at.set_cgsockcont(i .. ',"IP","yesinternet","0.0.0.0",0,0');
+            end;
+        end;
+    elseif string.match(sim_lower,"voda") then
+        if string.match(apn," live.vodafone.com") then
+            print("Socket APN already set to  live.vodafone.com for operator ", sim_operator, "\r\n");
+        else
+            print("Setting socket APN to  live.vodafone.com\r\n");
+            for i = 1,16 do
+                at.set_cgsockcont(i .. ',"IP"," live.vodafone.com","0.0.0.0",0,0');
             end;
         end;
     elseif string.match(sim_lower,"dtac") then
