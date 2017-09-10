@@ -178,7 +178,7 @@ function start_threads()
     end;
     print("all sub-threads ended\r\n");
 end;
-
+    
 printdir(1);
 vmsleep(12000);
 network_setup.set_network_from_sms_operator();

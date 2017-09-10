@@ -16,7 +16,7 @@ def put_file(serial_port, filename, file_contents):
     # serial_port.write("ATE0\r\n")
     # get_response(serial_port)
 
-    serial_port.write('AT+CFTRANRX="c:/%s",%i\r\n' %
+    serial_port.write('AT+CFTRANRX="%s",%i\r\n' %
                       (filename, len(file_contents)))
 
     response = get_response(serial_port, 0.5)
@@ -32,6 +32,25 @@ def put_file(serial_port, filename, file_contents):
     # get_response(serial_port)
 
 
+def put_binary_file(serial_port, filename, file_contents):
+    serial_port.write("ATE0\r\n")
+    get_response(serial_port)
+
+    serial_port.write('AT+CFTRANRX="%s",%i\r\n' %
+                      (filename, len(file_contents)))
+
+    response = get_response(serial_port, 3)
+    print "Respnose is " + response
+    get_response(serial_port)
+
+    serial_port.write(file_contents)
+    time.sleep(5)
+    serial_port.write("ATE1\r\n")
+    response = get_response(serial_port, 1)
+    if not "OK" in response:
+        raise ValueError(response)
+
+
 def change_dir(serial_port, directory):
     serial_port.write('AT+FSCD=%s\r\n' % directory)
     response = get_response(serial_port)
@@ -42,7 +61,7 @@ def change_dir(serial_port, directory):
 def compile_file(serial_port, filename):
     # serial_port.write("ATE0\r\n")
 
-    serial_port.write('AT+CSCRIPTCL="c:/%s"\r\n' % filename)
+    serial_port.write('AT+CSCRIPTCL="%s"\r\n' % filename)
     response = get_response(serial_port, 2)
     if "ERROR" in response:
         raise ValueError(response)
@@ -117,4 +136,9 @@ def stop_script(serial_port):
 
 def reset(serial_port):
     serial_port.write('AT+CRESET\r\n')
+    response = get_response(serial_port)
+
+
+def mkdir(serial_port, directory):
+    serial_port.write('AT+FSMKDIR=%s\r\n' % directory)
     response = get_response(serial_port)

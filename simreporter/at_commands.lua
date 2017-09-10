@@ -170,4 +170,10 @@ local get_cgsockcont = function()
 end;
 _M.get_cgsockcont = get_cgsockcont
 
+local change_dir = function(directory)
+    response = run_command("AT+FSCD=c:/"..directory);
+    return response;
+end;
+_M.change_dir = change_dir
+
 return _M
