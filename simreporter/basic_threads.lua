@@ -1,5 +1,12 @@
 local _M = {}
 
+local tcp = require "tcp_client"
+local encaps = require "encapsulation"
+local at = require "at_commands"
+local at_abs = require "at_abs"
+local device = require "device"
+
+
 local NMEA_EVENT = 35;
 
 local DEBUG = true;
@@ -45,8 +52,10 @@ function last_cell_report_has_expired()
     print("Now is: ", tostring(now), " last reported time is: ", tostring(copy_of_last_cell_report), " difference is: ", tostring(time_since_last_report), "\r\n");
     print("Difference is: ", tostring(time_since_last_report), ", min report time is: ", tostring(MIN_REPORT_TIME), "\r\n");
     if copy_of_last_cell_report == 0 or time_since_last_report > MIN_REPORT_TIME then
+        print("Returning true");
         return true;
     else
+        print("Returning false");
         return false;
     end;
     
