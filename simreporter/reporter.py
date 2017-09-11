@@ -1,6 +1,5 @@
 from atlib import *
 import time
-from __builtin__ import file
 
 
 #module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
@@ -27,6 +26,11 @@ def file_is_newer_than(file1, file2):
 try:
     get_response(module)
     change_dir(module, "c:/")
+
+    mkdir(module, "libs")
+    change_dir(module, "libs")
+    mkdir(module, "201709101")
+    change_dir(module, "201709101")
     set_autorun(module, False)
     files = [
         "at_abs.lua",
@@ -39,6 +43,7 @@ try:
         "reporter.lua",
         "tcp_client.lua",
         "util.lua",
+        "basic_threads.lua"
     ]
     compile_files = []
     stop_script(module)
@@ -50,10 +55,10 @@ try:
             print "Script not stopping, resetting module."
             reset(module)
             response = get_response(module, 2)
-            while("PB DONE" not in response and "CME_ERROR" not in response):
+            while("PB DONE" not in response and "CME_ERROR" not in response and "CME ERROR" not in response):
                 print("Waiting for module to start.")
                 response = get_response(module, 2)
-            sleep(5)
+            time.sleep(5)
             print("Module now ready.")
             break
 
@@ -64,7 +69,7 @@ try:
                     print "Putting file " + file
                     with open(file, 'r') as content_file:
                         content = content_file.read()
-                        put_file(module, file, content)
+                        put_file(module, "c:/libs/201709101/" + file, content)
                         # delete_file(module, file)
                     touch("lastupload/" + file)
                     compile_files.append(file)
@@ -78,13 +83,17 @@ try:
     #     delete_file(module, compiled)
 
     for file in compile_files:  # os.listdir("."):
-        compile_file(module, file)
+        compile_file(module, "c:/libs/201709101/" + file)
 
-    for file in files:  # os.listdir("."):
-        delete_file(module, file)
+    for file in compile_files:  # os.listdir("."):
+        delete_file(module, "c:/libs/201709101/" + file)
 
-    if "nmea_getinfo.lua" in compile_files:
-        delete_file(module, "autorun.out")
+    change_dir(module, "c:/")
+    with open("loader.lua", 'r') as content_file:
+        content = content_file.read()
+        put_file(module, "c:/loader.lua", content)
+    compile_file(module, "loader.lua")
+    delete_file(module, "autorun.out")
 
     # compile_file(module, "reporter.lua")
     ls(module)
@@ -99,8 +108,7 @@ try:
     #    get_response(module, 2)
     #    get_response(module, 2)
     #    run_script(module, "nmea_getinfo.out")
-    if "nmea_getinfo.lua" in compile_files:
-        copy_file(module, "nmea_getinfo.out", "autorun.out")
+    copy_file(module, "loader.out", "autorun.out")
 
     # getresponse(module, 1)
 
@@ -118,7 +126,7 @@ try:
     if counter > 20:
         print("Not running main script as module was reset")
     else:
-        run_script(module, "nmea_getinfo.out")
+        run_script(module, "loader.out")
 
     read_all(module)
 
