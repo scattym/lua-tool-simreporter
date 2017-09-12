@@ -1,7 +1,7 @@
 local _M = {}
 
-local at = require "at_commands"
-local util = require "util"
+local at = require("at_commands")
+local util = require("util")
 
     -- +CSPN: "YES OPTUS",1
     -- +CSPN: "Telstra",2

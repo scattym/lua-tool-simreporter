@@ -1,5 +1,6 @@
 
-local at = require "at_commands"
+local at = require("at_commands")
+local system = require("system")
 local _M = {}
 local get_device_info_table = function()
     cell_table = {}
@@ -16,6 +17,8 @@ local get_device_info_table = function()
     cell_table["cspn"] = at.get_cspn();
     cell_table["cimi"] = at.get_cimi();
     cell_table["osclock"] = os.clock();
+    cell_table["quarantined"] = system.quarantined_as_string();
+    cell_table["mem_used"] = system.get_current_memory();
     return cell_table;
 end;
 _M.get_device_info_table = get_device_info_table

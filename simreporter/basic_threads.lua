@@ -1,10 +1,20 @@
 local _M = {}
 
-local tcp = require "tcp_client"
-local encaps = require "encapsulation"
-local at = require "at_commands"
-local at_abs = require "at_abs"
-local device = require "device"
+printdir(1)
+print("In basic threads. Trying to load libraries.\r\n")
+function prequire(...)
+    local status, lib = pcall(require, ...)
+    if(status) then return lib end
+    --Library failed to load, so perhaps return `nil` or something?
+    print("unable to load ", ..., "\r\n")
+    return nil
+end
+
+local tcp = require("tcp_client")
+local encaps = require("encapsulation")
+local at = require("at_commands")
+local at_abs = require("at_abs")
+local device = require("device")
 
 
 local NMEA_EVENT = 35;
