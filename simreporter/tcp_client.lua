@@ -98,7 +98,7 @@ _M.open_network = open_network;
 
 local client_id_to_app_handle = function(client_id)
     if CLIENT_TO_APP_HANDLE[client_id] then
-        print("Using already created app_handle: ", CLIENT_TO_APP_HANDLE[client_id], "\r\n");
+        print("Using already created app_handle: ", CLIENT_TO_APP_HANDLE[client_id], " for client: ", client_id, "\r\n");
         return CLIENT_TO_APP_HANDLE[client_id];
     else
         local app_handle = open_network(client_id);
@@ -136,6 +136,7 @@ local send_data = function(client_id, host, port, data)
     SOCK_RST_SOCK_FAILED = 4
     SOCK_RST_NETWORK_FAILED = 5
     local result = false;
+    local response = ""
 
     print ("Client id is: ", client_id, "\r\n");
     --local app_handle = CLIENT_TO_APP_HANDLE[client_id];
@@ -187,6 +188,7 @@ local send_data = function(client_id, host, port, data)
     SOCK_ACCEPT_EVENT = 8
 
     local socket_fd = socket.create(app_handle, SOCK_TCP);
+
     if (not socket_fd or socket_fd < 1) then
         print("failed to create socket\r\n");
     elseif (ip_address) then
@@ -224,20 +226,26 @@ local send_data = function(client_id, host, port, data)
             local timeout = 30000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
             local err_code, sent_len = socket.send(socket_fd, data, timeout);
             print("socket.send ", err_code, ", ", sent_len, "\r\n");
+            local http_resp = ""
             if (err_code and (err_code == SOCK_RST_OK)) then
                 print("socket.recv()...\r\n");
                 local timeout = 15000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
 
-                local err_code, http_rsp = socket.recv(socket_fd, timeout);
-                print("socket.recv(), err_code=", err_code, "\r\n");
-                if ((err_code == SOCK_RST_OK) and http_rsp) then
+                while( err_code ~= SOCK_CLOSE_EVENT ) do
+                    err_code, fragment = socket.recv(socket_fd, timeout);
+                    print("socket.recv(), err_code=", err_code, "\r\n");
+                    if( fragment ) then
+                        print("Fragment is ", fragment, "\r\n")
+                        response = response .. fragment
+                    end
+                end
+                print("c(", client_id , "):Error code is now: ", err_code, "\r\n")
+                if ( response ) then
                     result = true;
                     if (printdir()) then
-                        os.printstr(http_rsp);--this can print string larger than 1024 bytes, and also it can print string including '\0'.
+                        os.printstr(response);--this can print string larger than 1024 bytes, and also it can print string including '\0'.
                     end;
                     print("\r\n");
-                else
-                    print("failed to call socket.recv\r\n");
                 end;
                 print("\r\n");
             end;
@@ -250,7 +258,7 @@ local send_data = function(client_id, host, port, data)
         end;
     end;
     collectgarbage();
-    return result;
+    return result, response;
 end
 _M.send_data = send_data;
 
@@ -274,37 +282,77 @@ local open_send_close_tcp = function(client_id, host, port, data)
     app_handle = open_network(client_id)
     print("App handle is ", tostring(app_handle), "\r\n")
     if( app_handle ) then
-        result = send_data(app_handle, host, port, data);
+        result, response = send_data(app_handle, host, port, data);
         close_network(app_handle);
         collectgarbage();
-        return result;
+        return result, response;
     else
         print("Invalid app handle returned: ", app_handle, "\r\n");
     end;
     collectgarbage();
-    return false;
+    return false, "";
 end;
 
 _M.open_send_close_tcp = open_send_close_tcp;
 
+
+local parse_http_headers = function(response)
+    local headers = {}
+    for line in response:gmatch("([^\r\n]*)\r\n?") do
+        for key, value in line:gmatch("(.*):\s(.*)\r\n") do
+            print("key is ", key, " value is ", value, "\r\n")
+            if( key and value ) then
+                headers[key] = value
+            end
+
+        end
+        print("Line is ", line, "\r\n")
+    end
+    return headers
+end
+
+local function TotalLength(HeaderLength, ContentLength)
+   return HeaderLength + ContentLength
+end
+
+-- Assume that Buff holds buffer to receive socket data
+local parse_http_response = function (C)
+    local payload = ""
+    local _, HeaderLength = C:find('\r\n\r\n')
+    local ContentLength = C:match("Content%-Length:%s(%d+)\r\n")
+    if (not ContentLength or not HeaderLength) then
+        print('Badly formed HTTP response.\r\n'..C)
+    end
+    local ExpectedLength = TotalLength(HeaderLength, ContentLength)
+    if (#C < ExpectedLength) then
+        print("Bad length\r\n")
+        return ""
+    end
+
+    -- local headers = parse_http_headers(C)
+    local Header = C:sub(1, HeaderLength)
+    payload = C:sub(HeaderLength+1, HeaderLength+ContentLength)
+    print("Payload is >", payload, "<\r\n")
+    return Header, payload
+end
+
+
 local http_open_send_close = function(client_id, host, port, url, data)
 
     if( client_id ) then
-        result = send_data(client_id, host, port, make_http_post(host, url, data));
+        result, response = send_data(client_id, host, port, make_http_post(host, url, data));
+        headers, payload = parse_http_response(response);
         collectgarbage();
-        return result;
+        return result, payload;
     else
         print("Invalid client id: ", client_id, "\r\n");
     end;
     collectgarbage();
-    return false;
+    return false, "";
 end;
 
 _M.http_open_send_close = http_open_send_close;
 
 
 return _M
-
-
-
 

@@ -2,20 +2,14 @@ local _M = {}
 
 printdir(1)
 print("In basic threads. Trying to load libraries.\r\n")
-function prequire(...)
-    local status, lib = pcall(require, ...)
-    if(status) then return lib end
-    --Library failed to load, so perhaps return `nil` or something?
-    print("unable to load ", ..., "\r\n")
-    return nil
-end
 
 local tcp = require("tcp_client")
 local encaps = require("encapsulation")
 local at = require("at_commands")
 local at_abs = require("at_abs")
 local device = require("device")
-
+local json = require("json")
+local unzip = require("unzip")
 
 local NMEA_EVENT = 35;
 
@@ -29,13 +23,14 @@ local MAIN_THREAD_SLEEP = 600000;
 local MAX_MAIN_THREAD_LOOP_COUNT = 9999999;
 local GPS_LOCK_CHECK_SLEEP_TIME = 20000;
 local GPS_LOCK_CHECK_MAX_LOOP = 9999999;
+local FIRMWARE_SLEEP_TIME = 45000;
 
 -- Drop intervals when in debug mode
 if( DEBUG ) then
     --GPS_LOCK_TIME = 10000;
-    NMEA_SLEEP_TIME = 10000;
-    REPORT_INTERVAL = 60000;
-    NMEA_LOOP_COUNT = 9999999;
+    NMEA_SLEEP_TIME = 20000;
+    REPORT_INTERVAL = 1800000;
+    NMEA_LOOP_COUNT = 3;
     MAIN_THREAD_SLEEP = 600000;
     MAX_MAIN_THREAD_LOOP_COUNT = 9999999;
 end;
@@ -46,6 +41,9 @@ local MIN_REPORT_TIME = (CELL_THREAD_SLEEP_TIME / 1000) - 5;
 
 local ati_string = at.get_device_info();
 local last_cell_report = 0;
+local imei = at_abs.get_imei()
+
+local running_version;
 
 function update_last_cell_report()
     thread.enter_cs(2);
@@ -114,8 +112,8 @@ function gps_tick()
                 print("nmea_data, len=", string.len(nmea_data), "\r\n");
                 local encapsulated_payload = encaps.encapsulate_nmea(ati_string, "nmea", nmea_data, i, NMEA_LOOP_COUNT);
 
-                local result = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/process_update", encapsulated_payload);
-                print("Result is ", tostring(result), "\r\n");
+                local result, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/process_update", encapsulated_payload);
+                print("Result is ", tostring(result), " and response is ", response, "\r\n");
             end;
             collectgarbage();
             thread.sleep(NMEA_SLEEP_TIME);
@@ -140,8 +138,8 @@ function cell_tick()
             for i=1,1 do
                 local cell_table = device.get_device_info_table();
                 local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, NMEA_LOOP_COUNT);
-                local result = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
-                print("Result is ", tostring(result), "\r\n");
+                local result, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
+                print("Result is ", tostring(result), " and response is ", response, "\r\n");
                 if result then
                     update_last_cell_report();
                 end;
@@ -158,16 +156,95 @@ function cell_tick()
     end;
 end;
 
-function start_threads()
+local function tohex(data)
+    return (data:gsub(".", function (x)
+        return ("%02x"):format(x:byte()) end)
+    )
+end
+
+function get_firmware(version)
+    local client_id = 4;
+    local open_net_result = tcp.open_network(client_id);
+    print("Open network response is: ", open_net_result, "\r\n");
+    local result, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/get_firmware?ident=imei:" .. imei, "");
+    print("Response is ", response, "\r\n")
+    local firmware_json = json.decode(response);
+    tcp.close_network(client_id);
+    print("\r\n")
+    print(firmware_json);
+    print("\r\n")
+    if( is_version_quarantined(firmware_json["version"]) ) then
+        print("Version ", firmware_json["version"], " is already quarantined, not expanding\r\n")
+    else
+        if( firmware_json["version"] and firmware_json["file"] and firmware_json["checksum"] ) then
+            print(firmware_json["version"]);
+            print("\r\n")
+            print(firmware_json["file"]);
+            print("\r\n")
+            raw_data = base64.decode(firmware_json["file"])
+            hash = sha256.init()
+            hash:update(raw_data)
+            checksum = hash:final()
+            checksum_hex = tohex(checksum)
+            if( not string.equal(checksum_hex, firmware_json["checksum"]) ) then
+                print("Checksums do not match. Calculated checksum is: ", checksum_hex, " but should be: ", firmware_json["checksum"])
+            else
+                if( raw_data ) then
+                    local zip_file_name = "c:/" .. firmware_json["version"] .. ".zip"
+                    file = io.open(zip_file_name,"w") assert(file)
+                    file:write(raw_data, "\n")
+                    file:close()
+                    unzip.unzip_file(zip_file_name, "c:/libs/" .. firmware_json["version"] .. "/")
+                end
+            end
+        end
+    end
+    collectgarbage();
+end
+
+function get_firmware_version()
+    print("Trying to retrieve firmware version\r\n");
+    print("ati string: ", ati_string, " imei: ", imei, "\r\n")
+    local client_id = 3;
+    while (true) do
+        local open_net_result = tcp.open_network(client_id);
+        print("Open network response is: ", open_net_result, "\r\n");
+        local result, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/get_firmware_version?ident=imei:" .. imei, "");
+        tcp.close_network(client_id);
+        print("Response is ", response, "\r\n")
+
+        if( result and response ) then
+            if( not string.equal(running_version, response) ) then
+                print("Need to update\r\n")
+                if( is_version_quarantined(response) ) then
+                    print("Version ", response, " is already quarantined, not downloading\r\n")
+                else
+                    print("Calling get_firmare\r\n")
+                    get_firmware(response)
+                end
+
+            end
+        end
+        collectgarbage();
+        thread.sleep(FIRMWARE_SLEEP_TIME);
+    end
+end
+
+function start_threads(version)
+    running_version = version;
     local gps_tick_thread = thread.create(gps_tick);
     local cell_tick_thread = thread.create(cell_tick);
+    local firmware_check_thread = thread.create(get_firmware_version);
     print(tostring(gps_tick_thread), "\r\n");
     print(tostring(cell_tick_thread), "\r\n");
+    print(tostring(firmware_check_thread), "\r\n");
     thread.sleep(1000);
     print("Starting threads\r\n");
     result = thread.run(gps_tick_thread);
     print("GPS start thread result is ", tostring(result), "\r\n");
     result = thread.run(cell_tick_thread);
+    print("Cell data start thread result is ", tostring(result), "\r\n");
+    result = thread.run(firmware_check_thread);
     print("Cell data start thread result is ", tostring(result), "\r\n");
 
     print("Threads are running\r\n");

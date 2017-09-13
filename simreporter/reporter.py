@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from atlib import *
 import time
 import os
@@ -33,16 +35,18 @@ def transfer_and_build_filers(dir):
         files = [
             "at_abs.lua",
             "at_commands.lua",
+            "basic_threads.lua",
             "canary.lua",
             "device.lua",
             "encapsulation.lua",
+            "json.lua",
             "network_setup.lua",
             "nmea_getinfo.lua",
             "reporter.lua",
             "system.lua",
             "tcp_client.lua",
             "util.lua",
-            "basic_threads.lua"
+            "unzip.lua",
         ]
         compile_files = []
         stop_script(serial_port)
@@ -57,7 +61,7 @@ def transfer_and_build_filers(dir):
                 while("START" not in response):
                     print("Waiting for module to start.")
                     response = get_response(serial_port, 2)
-                time.sleep(7)
+                time.sleep(15)
                 print("Module now ready.")
                 break
     
@@ -112,7 +116,7 @@ def transfer_and_build_filers(dir):
     
         # getresponse(module, 1)
     
-        set_autorun(serial_port, True)
+        set_autorun(serial_port, False)
     
         # run_script(serial_port, "canary.out")
         # stop_script(serial_port)

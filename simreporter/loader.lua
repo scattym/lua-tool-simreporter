@@ -12,7 +12,7 @@ function prequire(...)
     return nil
 end
 
-vmsleep(8000);
+vmsleep(3000);
 printdir(1);
 local quarantine_version = function(version)
     file = io.open("c:/quarantined","a") assert(file)
@@ -21,7 +21,7 @@ local quarantine_version = function(version)
     file:close()
 end
 
-local is_version_quarantined = function(version)
+is_version_quarantined = function(version)
     local file = io.open("c:/quarantined","r")
     if( not file ) then
         print("No file, so not quarantined\r\n")
@@ -70,13 +70,16 @@ end
 
 
 local max_version = pick_version()
+local running_version;
 
 local original_package_path = package.path
 print("Package path was: ", package.path, "\r\n")
 if( max_version ) then
     package.path = "/MultiMedia/libs/" .. max_version .."/?.out;" .. original_package_path
+    running_version = max_version
 else
     package.path = "/MultiMedia/libs/base/?.out;" .. original_package_path
+    running_version = "base"
 end
 print("Package path is: ", package.path, "\r\n")
 print("Max version is: ", max_version, "\r\n")

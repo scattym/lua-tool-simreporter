@@ -46,7 +46,7 @@ local function encode_table(val, stack)
   stack = stack or {}
 
   -- Circular reference?
-  if stack[val] then error("circular reference") end
+  if stack[val] then print("circular reference") end
 
   stack[val] = true
 
@@ -55,12 +55,12 @@ local function encode_table(val, stack)
     local n = 0
     for k in pairs(val) do
       if type(k) ~= "number" then
-        error("invalid table: mixed or invalid key types")
+        print("invalid table: mixed or invalid key types")
       end
       n = n + 1
     end
     if n ~= #val then
-      error("invalid table: sparse array")
+      print("invalid table: sparse array")
     end
     -- Encode
     for i, v in ipairs(val) do
@@ -73,7 +73,7 @@ local function encode_table(val, stack)
     -- Treat as an object
     for k, v in pairs(val) do
       if type(k) ~= "string" then
-        error("invalid table: mixed or invalid key types")
+        print("invalid table: mixed or invalid key types")
       end
       table.insert(res, encode(k, stack) .. ":" .. encode(v, stack))
     end
@@ -91,7 +91,7 @@ end
 local function encode_number(val)
   -- Check for NaN, -inf and inf
   if val ~= val or val <= -math.huge or val >= math.huge then
-    error("unexpected number value '" .. tostring(val) .. "'")
+    print("unexpected number value '" .. tostring(val) .. "'")
   end
   return string.format("%.14g", val)
 end
@@ -112,7 +112,7 @@ encode = function(val, stack)
   if f then
     return f(val, stack)
   end
-  error("unexpected type '" .. t .. "'")
+  print("unexpected type '" .. t .. "'")
 end
 
 
@@ -157,7 +157,7 @@ local function next_char(str, idx, set, negate)
 end
 
 
-local function decode_error(str, idx, msg)
+local function decode_print(str, idx, msg)
   local line_count = 1
   local col_count = 1
   for i = 1, idx - 1 do
@@ -167,7 +167,7 @@ local function decode_error(str, idx, msg)
       col_count = 1
     end
   end
-  error( string.format("%s at line %d col %d", msg, line_count, col_count) )
+  print( string.format("%s at line %d col %d", msg, line_count, col_count) )
 end
 
 
@@ -184,7 +184,7 @@ local function codepoint_to_utf8(n)
     return string.char(f(n / 262144) + 240, f(n % 262144 / 4096) + 128,
                        f(n % 4096 / 64) + 128, n % 64 + 128)
   end
-  error( string.format("invalid unicode codepoint '%x'", n) )
+  print( string.format("invalid unicode codepoint '%x'", n) )
 end
 
 
@@ -209,14 +209,14 @@ local function parse_string(str, i)
     local x = str:byte(j)
 
     if x < 32 then
-      decode_error(str, j, "control character in string")
+      decode_print(str, j, "control character in string")
     end
 
     if last == 92 then -- "\\" (escape char)
       if x == 117 then -- "u" (unicode escape sequence)
         local hex = str:sub(j + 1, j + 5)
         if not hex:find("%x%x%x%x") then
-          decode_error(str, j, "invalid unicode escape in string")
+          decode_print(str, j, "invalid unicode escape in string")
         end
         if hex:find("^[dD][89aAbB]") then
           has_surrogate_escape = true
@@ -226,7 +226,7 @@ local function parse_string(str, i)
       else
         local c = string.char(x)
         if not escape_chars[c] then
-          decode_error(str, j, "invalid escape char '" .. c .. "' in string")
+          decode_print(str, j, "invalid escape char '" .. c .. "' in string")
         end
         has_escape = true
       end
@@ -249,7 +249,7 @@ local function parse_string(str, i)
       last = x
     end
   end
-  decode_error(str, i, "expected closing quote for string")
+  decode_print(str, i, "expected closing quote for string")
 end
 
 
@@ -258,7 +258,7 @@ local function parse_number(str, i)
   local s = str:sub(i, x - 1)
   local n = tonumber(s)
   if not n then
-    decode_error(str, i, "invalid number '" .. s .. "'")
+    decode_print(str, i, "invalid number '" .. s .. "'")
   end
   return n, x
 end
@@ -268,7 +268,7 @@ local function parse_literal(str, i)
   local x = next_char(str, i, delim_chars)
   local word = str:sub(i, x - 1)
   if not literals[word] then
-    decode_error(str, i, "invalid literal '" .. word .. "'")
+    decode_print(str, i, "invalid literal '" .. word .. "'")
   end
   return literal_map[word], x
 end
@@ -295,7 +295,7 @@ local function parse_array(str, i)
     local chr = str:sub(i, i)
     i = i + 1
     if chr == "]" then break end
-    if chr ~= "," then decode_error(str, i, "expected ']' or ','") end
+    if chr ~= "," then decode_print(str, i, "expected ']' or ','") end
   end
   return res, i
 end
@@ -314,13 +314,13 @@ local function parse_object(str, i)
     end
     -- Read key
     if str:sub(i, i) ~= '"' then
-      decode_error(str, i, "expected string for key")
+      decode_print(str, i, "expected string for key")
     end
     key, i = parse(str, i)
     -- Read ':' delimiter
     i = next_char(str, i, space_chars, true)
     if str:sub(i, i) ~= ":" then
-      decode_error(str, i, "expected ':' after key")
+      decode_print(str, i, "expected ':' after key")
     end
     i = next_char(str, i + 1, space_chars, true)
     -- Read value
@@ -332,7 +332,7 @@ local function parse_object(str, i)
     local chr = str:sub(i, i)
     i = i + 1
     if chr == "}" then break end
-    if chr ~= "," then decode_error(str, i, "expected '}' or ','") end
+    if chr ~= "," then decode_print(str, i, "expected '}' or ','") end
   end
   return res, i
 end
@@ -365,13 +365,13 @@ parse = function(str, idx)
   if f then
     return f(str, idx)
   end
-  decode_error(str, idx, "unexpected character '" .. chr .. "'")
+  decode_print(str, idx, "unexpected character '" .. chr .. "'")
 end
 
 
 function json.decode(str)
   if type(str) ~= "string" then
-    error("expected argument of type string, got " .. type(str))
+    print("expected argument of type string, got " .. type(str))
   end
   return ( parse(str, next_char(str, 1, space_chars, true)) )
 end

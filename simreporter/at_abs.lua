@@ -15,6 +15,14 @@ local get_cspn = function()
 end 
 _M.get_cspn = get_cspn
 
+local get_imei = function()
+    imei_fields = {"imei"}
+    local ati_response = at.get_device_info();
+    local device_info_table = util.response_to_array(ati_response, "IMEI", ":", ",", imei_fields);
+    util.print_simple_table("device_info_table", device_info_table);
+    return device_info_table;
+end
+_M.get_imei = get_imei
 
 local get_sim_operator = function()
     spn_table = get_cspn()
