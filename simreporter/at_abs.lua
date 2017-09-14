@@ -20,7 +20,7 @@ local get_imei = function()
     local ati_response = at.get_device_info();
     local device_info_table = util.response_to_array(ati_response, "IMEI", ":", ",", imei_fields);
     util.print_simple_table("device_info_table", device_info_table);
-    return device_info_table;
+    return device_info_table["imei"];
 end
 _M.get_imei = get_imei
 

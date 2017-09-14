@@ -2,6 +2,7 @@
 local _M = {}
 
 local run_command = function(cmd)
+    print("Running command: ", cmd, "<<\r\n")
     print("Thread entering critical section\r\n");
     thread.enter_cs(1);
     print("Thread in critical section\r\n");
@@ -175,5 +176,11 @@ local change_dir = function(directory)
     return response;
 end;
 _M.change_dir = change_dir
+
+local reset = function()
+    response = run_command("AT+CRESET");
+    return response;
+end;
+_M.reset = reset
 
 return _M

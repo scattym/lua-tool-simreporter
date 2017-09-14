@@ -62,7 +62,7 @@ def compile_file(serial_port, filename):
     # serial_port.write("ATE0\r\n")
 
     serial_port.write('AT+CSCRIPTCL="%s"\r\n' % filename)
-    response = get_response(serial_port, 2)
+    response = get_response(serial_port, 2.5)
     if "ERROR" in response:
         raise ValueError(response)
 
@@ -114,7 +114,7 @@ def read_all(serial_port):
 
 def copy_file(serial_port, src, dest):
     serial_port.write('AT+FSCOPY="%s","%s"\r\n' % (src, dest))
-    response = get_response(serial_port, 0.5)
+    response = get_response(serial_port, 0.75)
     if not "OK" in response:
         raise ValueError(response)
 

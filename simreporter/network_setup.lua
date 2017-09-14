@@ -1,8 +1,31 @@
 
 at_abs = require "at_abs"
 at = require "at_commands"
-
 local _M = {}
+
+
+local operator_to_network_setup = function(sim_operator)
+    local network_table = {}
+    local match_table = {}
+    network_table["telstra"] = ',"IP","telstra.internet","0.0.0.0",0,0'
+    network_table["optus"] = ',"IP","yesinternet","0.0.0.0",0,0'
+    network_table["voda"] = ',"IP","live.vodafone.com","0.0.0.0",0,0'
+    network_table["dtac"] = ',"IP","www.dtac.co.th","0.0.0.0",0,0'
+
+    local fallback = ',"IP","internet","0.0.0.0",0,0'
+
+    print("In*****************************\r\n")
+    for operator, network_string in pairs(network_table) do
+        print("operator: ", operator, "\r\n")
+        if string.match(sim_operator:lower(), operator:lower()) then
+            print("Found match for ", sim_operator, "\r\n")
+            return network_string
+        end
+    end
+    print("Operator not found, returning fall back parameters\r\n")
+    return fallback
+end
+
 
 local set_operator_if_incorrect = function(sim_operator)
     local board_operator = at_abs.get_operator();
@@ -37,104 +60,31 @@ end;
 local set_gdcont_if_incorrect = function(sim_operator)
     local apn = at_abs.get_data_apn();
     local sim_lower = string.lower(sim_operator);
-    if string.match(sim_lower, "telstra") then
-        if string.match(apn,"telstra.internet") then
-            print("Data APN already set to telstra.internet for operator ", sim_operator, "\r\n");
-            
-        else
-            print("Setting data APN to telstra.internet\r\n");
-            for i = 1,16 do
-                at.set_cgdcont(i .. ',"IP","telstra.internet","0.0.0.0",0,0');
-            end;
-        end;
-    elseif string.match(sim_lower,"optus") then
-        if string.match(apn,"yesinternet") then
-            print("Data APN already set to yesinternet for operator ", sim_operator, "\r\n");
-        else
-            print("Setting data APN to yesinternet\r\n");
-            for i = 1,16 do
-                at.set_cgdcont(i .. ',"IP","yesinternet","0.0.0.0",0,0');
-            end;
-        end;
-    elseif string.match(sim_lower,"voda") then
-        if string.match(apn," live.vodafone.com") then
-            print("Data APN already set to  live.vodafone.com for operator ", sim_operator, "\r\n");
-        else
-            print("Setting data APN to  live.vodafone.com\r\n");
-            for i = 1,16 do
-                at.set_cgdcont(i .. ',"IP","  live.vodafone.com","0.0.0.0",0,0');
-            end;
-        end;
-    elseif string.match(sim_lower,"dtac") then
-        if string.match(apn,"www.dtac.co.th") then
-            print("Data APN already set to www.dtac.co.th for operator ", sim_operator, "\r\n");
-        else
-            print("Setting data APN to www.dtac.co.th\r\n");
-            for i = 1,16 do
-                at.set_cgdcont(i .. ',"IP","www.dtac.co.th","0.0.0.0",0,0');
-            end;
-        end;
+    print("APN: ", apn, " sim op: ", sim_operator, " sim_op_lower: ", sim_lower, "\r\n")
+    local network_string = operator_to_network_setup(sim_operator)
+    print("APN: ", apn, " sim op: ", sim_operator, " sim_op_lower: ", sim_lower, ", network string: ", network_string, "\r\n")
+    if string.match(apn, network_string) then
+        print("Data APN already set to ", network_string, " for operator ", sim_operator, "\r\n");
     else
-        if string.match(apn,"\"internet\"") then
-            print("Data APN already set to internet for operator ", sim_operator, "\r\n");
-        else
-            print("Setting data APN to internet\r\n");
-            for i = 1,16 do
-                at.set_cgdcont(i .. ',"IP","internet","0.0.0.0",0,0');
-            end;
+        print("Setting data APN to ", network_string, "\r\n");
+        for i = 1,16 do
+            at.set_cgdcont(i .. network_string);
         end;
     end
-
 end;
 
 local set_gsockcont_if_incorrect = function(sim_operator)
     local apn = at_abs.get_sock_apn();
     local sim_lower = string.lower(sim_operator);
-    if string.match(sim_lower, "telstra") then
-        if string.match(apn,"telstra.internet") then
-            print("Socket APN already set to telstra.internet for operator ", sim_operator, "\r\n");
-            
-        else
-            print("Setting socket APN to telstra.internet\r\n");
-            for i = 1,16 do
-                at.set_cgsockcont(i .. ',"IP","telstra.internet","0.0.0.0",0,0');
-            end;
-        end;
-    elseif string.match(sim_lower,"optus") then
-        if string.match(apn,"yesinternet") then
-            print("Socket APN already set to yesinternet for operator ", sim_operator, "\r\n");
-        else
-            print("Setting socket APN to yesinternet\r\n");
-            for i = 1,16 do
-                at.set_cgsockcont(i .. ',"IP","yesinternet","0.0.0.0",0,0');
-            end;
-        end;
-    elseif string.match(sim_lower,"voda") then
-        if string.match(apn," live.vodafone.com") then
-            print("Socket APN already set to  live.vodafone.com for operator ", sim_operator, "\r\n");
-        else
-            print("Setting socket APN to  live.vodafone.com\r\n");
-            for i = 1,16 do
-                at.set_cgsockcont(i .. ',"IP"," live.vodafone.com","0.0.0.0",0,0');
-            end;
-        end;
-    elseif string.match(sim_lower,"dtac") then
-        if string.match(apn,"www.dtac.co.th") then
-            print("Socket APN already set to www.dtac.co.th for operator ", sim_operator, "\r\n");
-        else
-            print("Setting socket APN to www.dtac.co.th\r\n");
-            for i = 1,16 do
-                at.set_cgsockcont(i .. ',"IP","www.dtac.co.th","0.0.0.0",0,0');
-            end;
-        end;
+    print("APN: ", apn, " sim op: ", sim_operator, " sim_op_lower: ", sim_lower, "\r\n")
+    local network_string = operator_to_network_setup(sim_operator)
+    print("APN: ", apn, " sim op: ", sim_operator, " sim_op_lower: ", sim_lower, ", network string: ", network_string, "\r\n")
+    if string.match(apn, network_string) then
+        print("Socket APN already set to ", network_string, " for operator ", sim_operator, "\r\n");
     else
-        if string.match(apn,"\"internet\"") then
-            print("Socket APN already set to internet for operator ", sim_operator, "\r\n");
-        else
-            print("Setting socket APN to internet\r\n");
-            for i = 1,16 do
-                at.set_cgsockcont(i .. ',"IP","internet","0.0.0.0",0,0');
-            end;
+        print("Setting socker APN to ", network_string, "\r\n");
+        for i = 1,16 do
+            at.set_cgsockcont(i .. network_string);
         end;
     end
 

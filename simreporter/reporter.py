@@ -22,23 +22,34 @@ def file_is_newer_than(file1, file2):
     return True
 
 
-def transfer_and_build_filers(dir):
+def transfer_and_build_files(directory, initial_reset):
     try:
-        get_response(serial_port)
+        set_autorun(serial_port, False)
+        if initial_reset:
+            reset(serial_port)
+            response = get_response(serial_port, 2)
+            while "START" not in response:
+                print("Waiting for module to start.")
+                response = get_response(serial_port, 2)
+            time.sleep(16)
+            print("Module now ready.")
+        else:
+            print("Not resetting. Be sure the script is not running.")
+
         change_dir(serial_port, "c:/")
-    
         mkdir(serial_port, "libs")
         change_dir(serial_port, "libs")
-        mkdir(serial_port, dir)
-        change_dir(serial_port, dir)
-        set_autorun(serial_port, False)
+        mkdir(serial_port, directory)
+        change_dir(serial_port, directory)
         files = [
             "at_abs.lua",
             "at_commands.lua",
             "basic_threads.lua",
             "canary.lua",
+            "config.lua",
             "device.lua",
             "encapsulation.lua",
+            "firmware.lua",
             "json.lua",
             "network_setup.lua",
             "nmea_getinfo.lua",
@@ -49,22 +60,7 @@ def transfer_and_build_filers(dir):
             "unzip.lua",
         ]
         compile_files = []
-        stop_script(serial_port)
-        counter = 0
-        while(script_is_running(serial_port)):
-            print "Script still running"
-            counter += 1
-            if counter > 30:
-                print "Script not stopping, resetting module."
-                reset(serial_port)
-                response = get_response(serial_port, 2)
-                while("START" not in response):
-                    print("Waiting for module to start.")
-                    response = get_response(serial_port, 2)
-                time.sleep(15)
-                print("Module now ready.")
-                break
-    
+
         for filename in files:  # os.listdir("."):
             if os.path.isfile(filename):
                 if "lua" in filename:
@@ -72,7 +68,7 @@ def transfer_and_build_filers(dir):
                         print "Putting file " + filename
                         with open(filename, 'r') as content_file:
                             content = content_file.read()
-                            put_file(serial_port, "c:/libs/base/" + filename, content)
+                            put_file(serial_port, "c:/libs/" + directory + "/" + filename, content)
                             # delete_file(module, file)
                         touch("lastupload/" + filename)
                         compile_files.append(filename)
@@ -84,9 +80,9 @@ def transfer_and_build_filers(dir):
         # for file in files:  # os.listdir("."):
         #     compiled = file.replace(".lua", ".out")
         #     delete_file(module, compiled)
-    
+        time.sleep(2)
         for filename in compile_files:  # os.listdir("."):
-            compile_file(serial_port, "c:/libs/base/" + filename)
+            compile_file(serial_port, "c:/libs/" + directory + "/" + filename)
     
         for filename in compile_files:  # os.listdir("."):
             delete_file(serial_port, filename)
@@ -116,7 +112,7 @@ def transfer_and_build_filers(dir):
     
         # getresponse(module, 1)
     
-        set_autorun(serial_port, False)
+        set_autorun(serial_port, True)
     
         # run_script(serial_port, "canary.out")
         # stop_script(serial_port)
@@ -144,6 +140,13 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
+        '-n',
+        '--no-initial-reset',
+        help="The target directory in libs. Defaults to base.",
+        default=False,
+        action="store_true"
+    )
+    parser.add_argument(
         '-d',
         '--directory',
         help="The target directory in libs. Defaults to base.",
@@ -152,4 +155,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    transfer_and_build_filers(args.directory)
+    transfer_and_build_files(args.directory, not args.no_initial_reset)

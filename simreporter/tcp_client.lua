@@ -242,10 +242,6 @@ local send_data = function(client_id, host, port, data)
                 print("c(", client_id , "):Error code is now: ", err_code, "\r\n")
                 if ( response ) then
                     result = true;
-                    if (printdir()) then
-                        os.printstr(response);--this can print string larger than 1024 bytes, and also it can print string including '\0'.
-                    end;
-                    print("\r\n");
                 end;
                 print("\r\n");
             end;
@@ -295,19 +291,30 @@ end;
 
 _M.open_send_close_tcp = open_send_close_tcp;
 
-
+-- HTTP/1.0 500 INTERNAL SERVER ERROR
+-- HTTP/1.0 200 OK
 local parse_http_headers = function(response)
     local headers = {}
+    headers["response_code"] = "000"
     for line in response:gmatch("([^\r\n]*)\r\n?") do
-        for key, value in line:gmatch("(.*):\s(.*)\r\n") do
-            print("key is ", key, " value is ", value, "\r\n")
-            if( key and value ) then
-                headers[key] = value
-            end
-
-        end
         print("Line is ", line, "\r\n")
+
+        local type, code, msg = line:match("([Hh][Tt][Tt][Pp]/[0-9].[0-9])%s+([0-9]*)%s+(.*)")
+        if( type and code and msg ) then
+            print("Type: ", type, " code: ", code, " msg: ", msg, "\r\n")
+            headers["response_code"] = code
+        else
+            for key, value in line:gmatch("(%S*):%s*(.*)") do
+                print("key is ", key, " value is ", value, "\r\n")
+                if( key and value ) then
+                    headers[key] = value
+                end
+
+            end
+        end
     end
+    print("Finished parsing headers\r\n")
+    collectgarbage()
     return headers
 end
 
@@ -316,39 +323,48 @@ local function TotalLength(HeaderLength, ContentLength)
 end
 
 -- Assume that Buff holds buffer to receive socket data
-local parse_http_response = function (C)
+local parse_http_response = function (buffer)
     local payload = ""
-    local _, HeaderLength = C:find('\r\n\r\n')
-    local ContentLength = C:match("Content%-Length:%s(%d+)\r\n")
+    local _, HeaderLength = buffer:find('\r\n\r\n')
+    local ContentLength = buffer:match("Content%-Length:%s(%d+)\r\n")
     if (not ContentLength or not HeaderLength) then
-        print('Badly formed HTTP response.\r\n'..C)
+        print('Badly formed HTTP response.\r\n'..buffer)
+        return {}, ""
     end
     local ExpectedLength = TotalLength(HeaderLength, ContentLength)
-    if (#C < ExpectedLength) then
+    if (#buffer < ExpectedLength) then
         print("Bad length\r\n")
         return ""
     end
 
-    -- local headers = parse_http_headers(C)
-    local Header = C:sub(1, HeaderLength)
-    payload = C:sub(HeaderLength+1, HeaderLength+ContentLength)
-    print("Payload is >", payload, "<\r\n")
-    return Header, payload
+
+    print("Preparing header buffer\r\n")
+    local header_buf = buffer:sub(1, HeaderLength)
+    print("Parsing headers\r\n")
+    local headers = parse_http_headers(header_buf)
+    print("Extracting payload\r\n")
+    payload = buffer:sub(HeaderLength+1, HeaderLength+ContentLength)
+    --print("Payload is >", payload, "<\r\n")
+    print("Mem usage: ", tostring(getcurmem()), "\r\n")
+    collectgarbage()
+    return headers, payload
 end
 
 
 local http_open_send_close = function(client_id, host, port, url, data)
 
-    if( client_id ) then
-        result, response = send_data(client_id, host, port, make_http_post(host, url, data));
-        headers, payload = parse_http_response(response);
-        collectgarbage();
-        return result, payload;
-    else
+    if( not client_id ) then
         print("Invalid client id: ", client_id, "\r\n");
+    else
+        result, response = send_data(client_id, host, port, make_http_post(host, url, data));
+        if( result and response ) then
+            headers, payload = parse_http_response(response);
+            collectgarbage();
+            return result, headers, payload;
+        end
     end;
     collectgarbage();
-    return false, "";
+    return false, "", "";
 end;
 
 _M.http_open_send_close = http_open_send_close;

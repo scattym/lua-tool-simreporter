@@ -6,30 +6,34 @@ collectgarbage();
 
 function prequire(...)
     local status, lib = pcall(require, ...)
-    if(status) then return lib end
+    if status then return lib end
     --Library failed to load, so perhaps return `nil` or something?
     print("unable to load ", ..., "\r\n")
     return nil
 end
-
+DEBUG_LEVEL = 10
 vmsleep(3000);
 printdir(1);
-local quarantine_version = function(version)
-    file = io.open("c:/quarantined","a") assert(file)
-    -- file:trunc(0)
-    file:write(version, "\n")
-    file:close()
+
+quarantine_version = function(version)
+    print("Quarantining version: ", version, "\r\n")
+    if version and not string.equal(version, "base") then
+        file = io.open("c:/quarantined","a") assert(file)
+        -- file:trunc(0)
+        result = file:write(version, "\n")
+        print("File write result: ", result, "\r\n")
+        file:close()
+    end
 end
 
 is_version_quarantined = function(version)
     local file = io.open("c:/quarantined","r")
-    if( not file ) then
+    if not file  then
         print("No file, so not quarantined\r\n")
         return false
     end
 
     while true do
-
         local line = file:read("*l")
         if line == nil then
             print("Reached end of file\r\n")
@@ -37,7 +41,7 @@ is_version_quarantined = function(version)
         end
         print("line is ", line, "<\r\n")
         if( string.equal(line, version) ) then
-            print("Found version in quarantined file\r\n")
+            print("Found version ", version, " in quarantined file\r\n")
             return true
         end
     end
@@ -50,24 +54,33 @@ local pick_version = function()
     local max_version
     print("Starting\r\n")
     for i, directory in ipairs(dir_list) do
-      print("Checking directory: ", directory, "\r\n")
-      version = tonumber(directory)
-      print("version is: ", version, "\r\n")
-      if( version ) then
-        if( not max_version or version > max_version ) then
-            if( is_version_quarantined(version) ) then
-                print("version is quarantined\r\n")
-            else
-                max_version = version
+        print("Checking directory: ", directory, "\r\n")
+        version = tonumber(directory)
+        print("version is: ", version, "\r\n")
+        if not version then
+            print("Unable to convert ", directory, " to a version number\r\n")
+            if not max_version or version > max_version then
+                if( is_version_quarantined(version) ) then
+                    print("version is quarantined. Deleting files.\r\n")
+                    local dir_list, file_list = os.lsdir("c:/libs/"..version.."/")
+                    for i, file in ipairs(file_list) do
+                        print("Deleting file: ", "c:/libs/"..version.."/"..file, "\r\n")
+                        local file_delete = os.delfile("c:/libs/"..version.."/"..file)
+                        print("File delete result: ", file_delete, "\r\n")
+                    end
+                    print("Deleting directory: ", "c:/libs/"..version.."/", "\r\n")
+                    local dir_delete = os.rmdir("c:/libs/"..version.."/")
+                    print("Directory delete result: ", dir_delete, "\r\n")
+                else
+                    print("max version now set to: ", max_version, "\r\n")
+                    max_version = version
+                end
             end
         end
-      end
     end
     collectgarbage()
     return max_version
 end
-
-
 
 local max_version = pick_version()
 local running_version;
@@ -91,15 +104,22 @@ network_setup = prequire("network_setup")
 basic_threads = prequire("basic_threads")
 printdir(1);
 if( network_setup == nil or basic_threads == nil ) then
-    print("Unable to load modules from version ", max_version, "\r\n")
-    if( max_version == "base" ) then
-        print("Not removing base\r\n")
+    print("Unable to load modules from version ", running_version, "\r\n")
+    if running_version == "base" then
+        print("Not quarantining base\r\n")
     else
-        print("Quarantining version ", max_version, "\r\n")
-        quarantine_version(max_version)
+        print("Quarantining version ", running_version, "\r\n")
+        quarantine_version(running_version)
+        os.restartscript()
+        print("Script restart failed. Resetting device\r\n")
+        thread.sleep(60000)
+        sio.send("AT+CRESET\r\n")
+        thread.sleep(7200000)
+        print("Device restart failed\r\n")
     end
-    os.restartscript()
 end
+
+collectgarbage()
 
 network_setup.set_network_from_sms_operator();
 vmsleep(15000);
@@ -111,7 +131,8 @@ main_id = thread.identity();
 print("main_id=", main_id, "\r\n");
 
 collectgarbage();
-basic_threads.start_threads();
+print("Starting threads\r\n")
+basic_threads.start_threads(running_version);
 
 print("exit main thread\r\n");
 

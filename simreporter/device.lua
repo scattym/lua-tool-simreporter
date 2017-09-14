@@ -16,9 +16,11 @@ local get_device_info_table = function()
     cell_table["ciccid"] = at.get_ciccid();
     cell_table["cspn"] = at.get_cspn();
     cell_table["cimi"] = at.get_cimi();
-    cell_table["osclock"] = os.clock();
+    cell_table["osclock"] = system.get_uptime();
     cell_table["quarantined"] = system.quarantined_as_string();
     cell_table["mem_used"] = system.get_current_memory();
+    cell_table["peak_mem_used"] = system.get_peak_memory();
+    cell_table["max_memory"] = system.get_max_memory();
     return cell_table;
 end;
 _M.get_device_info_table = get_device_info_table
