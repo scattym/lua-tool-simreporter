@@ -82,7 +82,7 @@ local set_gsockcont_if_incorrect = function(sim_operator)
     if string.match(apn, network_string) then
         print("Socket APN already set to ", network_string, " for operator ", sim_operator, "\r\n");
     else
-        print("Setting socker APN to ", network_string, "\r\n");
+        print("Setting socket APN to ", network_string, "\r\n");
         for i = 1,16 do
             at.set_cgsockcont(i .. network_string);
         end;

@@ -7,8 +7,37 @@ import os.path
 import argparse
 
 # module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
+serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9991", 115200, timeout=5)
 # module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
+
+VERSION = "201709141"
+
+files = [
+    "at_abs.lua",
+    "at_commands.lua",
+    "basic_threads.lua",
+    "canary.lua",
+    "config.lua",
+    "device.lua",
+    "encapsulation.lua",
+    "firmware.lua",
+    "json.lua",
+    "logging.lua",
+    "network_setup.lua",
+    "nmea_getinfo.lua",
+    "reporter.lua",
+    "system.lua",
+    "tcp_client.lua",
+    "util.lua",
+    "unzip.lua",
+]
+
+
+def zip_files():
+    cmd = "~/git/zlib/contrib/minizip/minizip %s.zip %s" % (VERSION,  " ".join(files))
+    print(cmd)
+    result = os.system(cmd)
+    print("Result is %s" % result)
 
 
 def touch(fname, times=None):
@@ -22,7 +51,7 @@ def file_is_newer_than(file1, file2):
     return True
 
 
-def transfer_and_build_files(directory, initial_reset):
+def transfer_and_build_files(directory, initial_reset, force_all_files):
     try:
         set_autorun(serial_port, False)
         if initial_reset:
@@ -41,31 +70,13 @@ def transfer_and_build_files(directory, initial_reset):
         change_dir(serial_port, "libs")
         mkdir(serial_port, directory)
         change_dir(serial_port, directory)
-        files = [
-            "at_abs.lua",
-            "at_commands.lua",
-            "basic_threads.lua",
-            "canary.lua",
-            "config.lua",
-            "device.lua",
-            "encapsulation.lua",
-            "firmware.lua",
-            "json.lua",
-            "logging.lua",
-            "network_setup.lua",
-            "nmea_getinfo.lua",
-            "reporter.lua",
-            "system.lua",
-            "tcp_client.lua",
-            "util.lua",
-            "unzip.lua",
-        ]
+
         compile_files = []
 
         for filename in files:  # os.listdir("."):
             if os.path.isfile(filename):
                 if "lua" in filename:
-                    if file_is_newer_than(filename, "lastupload/" + filename):
+                    if file_is_newer_than(filename, "lastupload/" + filename) or force_all_files:
                         print "Putting file " + filename
                         with open(filename, 'r') as content_file:
                             content = content_file.read()
@@ -141,6 +152,13 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
+        '-f',
+        '--force-all-files',
+        help="Force the transfer of all files. Overrides lastupload logic.",
+        default=False,
+        action="store_true"
+    )
+    parser.add_argument(
         '-n',
         '--no-initial-reset',
         help="The target directory in libs. Defaults to base.",
@@ -154,6 +172,17 @@ if __name__ == '__main__':
         default="base"
     )
 
+    parser.add_argument(
+        '-z',
+        '--zip-files',
+        help="Create zip file and don't upload scripts to device.",
+        default=False,
+        action="store_true"
+    )
+
     args = parser.parse_args()
 
-    transfer_and_build_files(args.directory, not args.no_initial_reset)
+    if args.zip_files:
+        zip_files()
+    else:
+        transfer_and_build_files(args.directory, not args.no_initial_reset, args.force_all_files)
