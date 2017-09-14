@@ -34,7 +34,10 @@ _M.get_peak_memory = get_peak_memory
 
 
 local get_max_memory = function()
-    return tostring(getmaxmem());
+    if getmaxmem ~= nil then
+        return tostring(getmaxmem());
+    end
+    return 0
 end
 _M.get_max_memory = get_max_memory
 
