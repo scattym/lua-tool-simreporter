@@ -59,6 +59,7 @@ local pick_version = function()
         print("version is: ", version, "\r\n")
         if not version then
             print("Unable to convert ", directory, " to a version number\r\n")
+        else
             if not max_version or version > max_version then
                 if( is_version_quarantined(version) ) then
                     print("version is quarantined. Deleting files.\r\n")

@@ -71,11 +71,14 @@ function gps_tick()
         print("Requesting nmea data\r\n");
         local open_net_result = tcp.open_network(client_id);
         print("Open network response is: ", open_net_result, "\r\n");
-        for i=1,config.get_config_value("NMEA_LOOP_COUNT") do
+        local max_loop_count = config.get_config_value("NMEA_LOOP_COUNT")
+        local current_loop = 0
+        while max_loop_count == 0 or current_loop <= max_loop_count do
+            current_loop = current_loop + 1
 
             local cell_table = device.get_device_info_table();
-            local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, NMEA_LOOP_COUNT);
-            local result, headers, payload = tcp.http_open_send_close(client_id, "services.do.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
+            local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, NMEA_LOOP_COUNT);
+            local result, headers, payload = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/v2/process_update", encapsulated_payload);
             if result and headers["response_code"] == "200" then
                 update_last_cell_report();
             end;
@@ -84,9 +87,11 @@ function gps_tick()
             local nmea_data = nmea.getinfo(63);
             if (nmea_data) then
                 print("nmea_data, len=", string.len(nmea_data), "\r\n");
-                local encapsulated_payload = encaps.encapsulate_nmea(ati_string, "nmea", nmea_data, i, NMEA_LOOP_COUNT);
+                local nmea_table = {}
+                nmea_table["nmea"] = nmea_data
+                local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, NMEA_LOOP_COUNT);
 
-                local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/process_update", encapsulated_payload);
+                local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/v2/process_cell_update", encapsulated_payload);
                 print("Result is ", tostring(result), " and response is ", response, "\r\n");
             end;
             collectgarbage();
@@ -112,7 +117,7 @@ function cell_tick()
             for i=1,1 do
                 local cell_table = device.get_device_info_table();
                 local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, config.get_config_value("NMEA_LOOP_COUNT"));
-                local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/process_cell_update", encapsulated_payload);
+                local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/v2/process_update", encapsulated_payload);
                 print("Result is ", tostring(result), " and response is ", response, "\r\n");
                 if result and headers["response_code"] == "200" then
                     update_last_cell_report();
@@ -144,9 +149,12 @@ end
 function start_threads(version)
     running_version = version;
 
-    print("Trying to load config first time\r\n")
-    local config_load_result = config.load_config_from_file()
-    print("Config load result is ", config_load_result, "\r\n")
+    --print("Trying to load config first time\r\n")
+    --local config_load_result = config.load_config_from_file()
+    --print("Config load result is ", config_load_result, "\r\n")
+    print("Trying to save config to file\r\n")
+    local config_save_result = config.save_config_to_file()
+    print("Save config result is ", config_save_result, "\r\n")
 
     local gps_tick_thread = thread.create(gps_tick);
     local cell_tick_thread = thread.create(cell_tick);
@@ -178,7 +186,8 @@ function start_threads(version)
         end;
         collectgarbage();
     end;
-    print("all sub-threads ended\r\n");
+    print("All sub-threads ended. Resetting device\r\n");
+    at.reset()
 end;
 
 _M.start_threads = start_threads

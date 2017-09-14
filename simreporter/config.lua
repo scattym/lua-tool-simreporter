@@ -3,16 +3,22 @@ local _M = {}
 json = require("json")
 
 local CONFIG ={}
+-- Time to sleep between successive nmea reports
 CONFIG["NMEA_SLEEP_TIME"] = 30000
+-- Report GPS at this interval. Turns off GPS in between
 CONFIG["REPORT_INTERVAL"] = 3600000
+-- Number of NMEA reports to send every REPORT_INTERVAL, set to 0 for infinite
 CONFIG["NMEA_LOOP_COUNT"] = 5
 CONFIG["MAIN_THREAD_SLEEP"] = 600000
-CONFIG["MAX_MAIN_THREAD_LOOP_COUNT"] = 9999999
+-- Number of times to run main thread before exiting, set to 0 for infinite
+CONFIG["MAX_MAIN_THREAD_LOOP_COUNT"] = 0
 CONFIG["GPS_LOCK_CHECK_SLEEP_TIME"] = 20000
-CONFIG["GPS_LOCK_CHECK_MAX_LOOP"] = 9999999
-CONFIG["FIRMWARE_SLEEP_TIME"] = 45000
+CONFIG["GPS_LOCK_CHECK_MAX_LOOP"] = 50
+CONFIG["FIRMWARE_SLEEP_TIME"] = 3600000
 CONFIG["CELL_THREAD_SLEEP_TIME"] = 7200000
 CONFIG["MIN_REPORT_TIME"] = 7195
+CONFIG["UPDATE_HOST"] = "home.scattym.com"
+CONFIG["UPDATE_PORT"] = 65535
 
 local MUST_BE_INTS = {
     "NMEA_SLEEP_TIME",
@@ -24,7 +30,8 @@ local MUST_BE_INTS = {
     "GPS_LOCK_CHECK_MAX_LOOP",
     "FIRMWARE_SLEEP_TIME",
     "CELL_THREAD_SLEEP_TIME",
-    "MIN_REPORT_TIME"
+    "MIN_REPORT_TIME",
+    "UPDATE_PORT"
 }
 
 local check_if_should_be_int = function(key)
