@@ -1,5 +1,6 @@
 
 local _M = {}
+logger = require("logging")
 
 local str_split = function(string, inSplitPattern, outResults )
     if not outResults then
@@ -43,36 +44,36 @@ _M.trim = trim
 
 local response_to_array = function(response, key, key_val_sep, field_sep, field_name_array)
     local return_table = {}
-    print("response string is ", tostring(response), "\r\n")
+    logger.log("util", 0, "response string is ", tostring(response))
     -- +CSPN: "YES OPTUS",1
     -- +CSPN: "Telstra",2
     -- Normalise ": " to ":"
     if response == nil then
-        print("Reponse string is nil. Not parsing\r\n");
+        logger.log("util", 0, "Reponse string is nil. Not parsing");
         return return_table;
     end;
     line_array = split(response, "\r\n");
     for num = 1,#line_array do
-        print("Processing line ", tostring(line_array[num]), "\r\n");
+        logger.log("util", 0, "Processing line ", tostring(line_array[num]));
         if string.match(line_array[num], key) then
-            print("Found key: ", key, " in line: ", line_array[num], "\r\n")
+            logger.log("util", 0, "Found key: ", key, " in line: ", line_array[num])
             local key_value_arr = split(line_array[num], key_val_sep)
             if #key_value_arr == 2 then
                 local field_array = split(key_value_arr[2], field_sep)
                 if field_array == nil then
-                    print ("Unable to split key/value pair. Field array is nil\r\n");
+                    logger.log("util", 30, "Unable to split key/value pair. Field array is nil");
                 elseif #field_array ~= #field_name_array then
-                    print("Field array size does not match. Expecting: ", tostring(#field_name_array), " but got: ", tostring(#field_array), "\r\n");
+                    logger.log("util", 30, "Field array size does not match. Expecting: ", tostring(#field_name_array), " but got: ", tostring(#field_array));
                 else
                     for field_name_iter = 1, #field_name_array do
                         return_table[field_name_array[field_name_iter]] = trim(field_array[field_name_iter]);
                     end
                 end
             else
-                print("Unable to split key/value pair. Size is ", #key_value_arr, "\r\n");
+                logger.log("util", 30, "Unable to split key/value pair. Size is ", #key_value_arr);
             end
         else
-            print("Key: ", key, " not in line: ", line_array[num], "\r\n");
+            logger.log("util", 20, "Key: ", key, " not in line: ", line_array[num]);
         end
     end
     return return_table;
@@ -80,9 +81,9 @@ end
 _M.response_to_array = response_to_array
 
 local print_simple_table = function(name, input)
-    print("Table: ", name, "\r\n");
+    logger.log("util", 20, "Table: ", name);
     for key, value in pairs(input) do
-      print(key, " => ", value, "\r\n");
+      logger.log("util", 20, key, " => ", value);
     end
 end
 _M.print_simple_table = print_simple_table

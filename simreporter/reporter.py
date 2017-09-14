@@ -51,6 +51,7 @@ def transfer_and_build_files(directory, initial_reset):
             "encapsulation.lua",
             "firmware.lua",
             "json.lua",
+            "logging.lua",
             "network_setup.lua",
             "nmea_getinfo.lua",
             "reporter.lua",

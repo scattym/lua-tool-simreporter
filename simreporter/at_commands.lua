@@ -1,11 +1,11 @@
-
+local logger = require("logging")
 local _M = {}
 
 local run_command = function(cmd)
-    print("Running command: ", cmd, "<<\r\n")
-    print("Thread entering critical section\r\n");
+    logger.log("at_commands", 0, "Running command: ", cmd, "<<")
+    logger.log("at_commands", 0, "Thread entering critical section");
     thread.enter_cs(1);
-    print("Thread in critical section\r\n");
+    logger.log("at_commands", 0, "Thread in critical section");
     local echo_off = "ATE0\r\n"
     local echo_on = "ATE1\r\n"
     sio.send(echo_off)
@@ -14,17 +14,17 @@ local run_command = function(cmd)
 
     --clear sio recv cache
     sio.clear()
-    --print(cmd .. "\r\n")
+    --logger.log("at_commands", 0, cmd .. "\r\n")
     sio.send(cmd .. "\r\n")
     --receive response with 5000 ms time out
     return_string = sio.recv(5000)
-    print(rsp, "\r\n")
+    logger.log("at_commands", 0, rsp)
 
     sio.send(echo_on)
     --receive response with 5000 ms time out
     rsp = sio.recv(5000)
     thread.leave_cs(1);
-    print("Thread out of critical section\r\n");
+    logger.log("at_commands", 0, "Thread out of critical section");
 
     return return_string;
 end;

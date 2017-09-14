@@ -24,7 +24,7 @@ def put_file(serial_port, filename, file_contents):
         raise ValueError(response)
 
     serial_port.write(file_contents)
-    response = get_response(serial_port, 1)
+    response = get_response(serial_port, 1.5)
     if not "OK" in response:
         raise ValueError(response)
 
@@ -62,7 +62,7 @@ def compile_file(serial_port, filename):
     # serial_port.write("ATE0\r\n")
 
     serial_port.write('AT+CSCRIPTCL="%s"\r\n' % filename)
-    response = get_response(serial_port, 2.5)
+    response = get_response(serial_port, 3)
     if "ERROR" in response:
         raise ValueError(response)
 

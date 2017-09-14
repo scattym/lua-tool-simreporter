@@ -1,7 +1,7 @@
 local _M = {}
 
 json = require("json")
-
+logger = require("logging")
 local CONFIG ={}
 -- Time to sleep between successive nmea reports
 CONFIG["NMEA_SLEEP_TIME"] = 30000
@@ -51,7 +51,7 @@ _M.get_config_value = get_config_value
 local set_config_value = function(key, value)
     if check_if_should_be_int(key) then
         if type(value) ~= "number" then
-            print(key, " must be an integer, but is ", type(value), ". Ignoring\r\n")
+            logger.log("config", 0, key, " must be an integer, but is ", type(value), ". Ignoring")
             return false
         end
     end
@@ -83,7 +83,7 @@ local calc_checksum = function(config_table)
 
     for i,key in ipairs(temp_table) do
         if not string.equal("checksum", key) then
-            print("Updating with key: ", tostring(key), " and value: ", config_table[key], "\r\n")
+            logger.log("config", 0, "Updating with key: ", tostring(key), " and value: ", config_table[key])
             hash:update(tostring(key))
             hash:update(tostring(config_table[key]))
         end
@@ -97,24 +97,24 @@ end
 
 local check_hmac_config = function(config_table)
     table_checksum = calc_checksum(config_table)
-    print("Comparing checksum ", table_checksum, " to advertised checksum of ", config_table["checksum"], "\r\n")
+    logger.log("config", 0, "Comparing checksum ", table_checksum, " to advertised checksum of ", config_table["checksum"])
     if config_table["checksum"] and string.equal(table_checksum, config_table["checksum"]) then
-        print("Checksums are equal\r\n")
+        logger.log("config", 0, "Checksums are equal")
         return true
     end
-    print("Checksum check failed\r\n")
+    logger.log("config", 0, "Checksum check failed")
     return false
 end
 
 local set_config_from_json = function(json_str)
-    print("Setting config from json\r\n")
+    logger.log("config", 0, "Setting config from json")
     config_table = json.decode(json_str)
     if not config_table then
-        print("Unable to load json from string")
+        logger.log("config", 0, "Unable to load json from string")
         return false
     end
     if check_hmac_config(config_table) then
-        print("Passed hmac test, setting config\r\n")
+        logger.log("config", 0, "Passed hmac test, setting config")
         set_config_from_table(config_table)
         return true
     end
@@ -129,7 +129,7 @@ local save_config_to_file = function()
         checksum = calc_checksum(CONFIG)
         set_config_value("checksum", checksum)
         result = file:write(json.encode(CONFIG))
-        print("Config file write result: ", result, "\r\n")
+        logger.log("config", 0, "Config file write result: ", result)
         file:close()
         collectgarbage()
         return true
@@ -140,17 +140,17 @@ end
 _M.save_config_to_file = save_config_to_file
 
 local load_config_from_file = function()
-    print("Starting config load\r\n")
+    logger.log("config", 0, "Starting config load")
     local file = io.open("c:/config.json","r")
-    print("File open attempt finished\r\n")
+    logger.log("config", 0, "File open attempt finished")
     if not file then
-        print("Unable to load config file, not present or not readable\r\n")
+        logger.log("config", 0, "Unable to load config file, not present or not readable")
         return false
     end
     local content = file:read("*all")
-    print("Config file content is ", content, "<\r\n")
+    logger.log("config", 0, "Config file content is ", content, "<")
     local set_config_result = set_config_from_json(content)
-    print("Set config result is ", set_config_result, "\r\n")
+    logger.log("config", 0, "Set config result is ", set_config_result)
     collectgarbage()
     return set_config_result
 end

@@ -1,13 +1,15 @@
 --require "chipsim"
 --require "network"
 --local socket = require("simsocket")
+local logger = require("logging")
 
 local _M = {}
 
 local CLIENT_TO_APP_HANDLE = {}
+logger.create_logger("tcp_client", 0)
 
 function check_and_enable_network(app_handle)
-    print("check_network_dorm_function, app_handle: " , app_handle, "\r\n");
+    logger.log("tcp_client", 0, "check_network_dorm_function, app_handle: " , app_handle);
     network_state = {};
     network_state.invalid = 0;
     network_state.down = 1;
@@ -18,49 +20,49 @@ function check_and_enable_network(app_handle)
     network_state.going_null = 32;
     network_state.null = 64;
     local status = network.status(app_handle);
-    print("network status = ", status, "\r\n");
+    logger.log("tcp_client", 0, "network status = ", status);
     local safety_counter = 0;
     while (status ~= network_state.up) do
         if (status ~= network_state.resuming and status ~= network_state.coming_up) then
-            print("Trying to bring network up\r\n");
+            logger.log("tcp_client", 0, "Trying to bring network up");
             network.dorm(app_handle, false);
         else
-            print("Network is already trying to come up\r\n");
+            logger.log("tcp_client", 0, "Network is already trying to come up");
         end;
         vmsleep(1000);
         status = network.status(app_handle)
-        print("network status = ", status, "\r\n");
+        logger.log("tcp_client", 0, "network status = ", status);
         if( safety_counter > 10 ) then
             return false;
         end;
         safety_counter = safety_counter + 1;
     end;
-    print("Network state is up: ", status, "\r\n");
+    logger.log("tcp_client", 0, "Network state is up: ", status);
     return true;
 end;
 
 function set_network_dormant(app_handle)
-    print("Setting network dormant\r\n")
+    logger.log("tcp_client", 0, "Setting network dormant")
     network.dorm(app_handle, false);
 end;
 
 function config_network_common_parameters()
-    print("config_network_common_parameters\r\n");
+    logger.log("tcp_client", 0, "config_network_common_parameters");
     --The same with AT+CTCPKA
     result = network.set_tcp_ka_param(5, 1);--keep alive parameter, max 5 times, check every 1 minute if socket is idle.
-    print("network.set_tcp_ka_param()=", result, "\r\n");
+    logger.log("tcp_client", 0, "network.set_tcp_ka_param()=", result);
     --The same with AT+CIPCCFG
     result = network.set_tcp_retran_param(10, 10000);--maximum 10 retransmit times, minimum interval is 10 seconds.
-    print("network.set_tcp_retran_param()=", result, "\r\n");
+    logger.log("tcp_client", 0, "network.set_tcp_retran_param()=", result);
     --The same with AT+CIPDNSSET
     result = network.set_dns_timeout_param(0, 30000, 5);--network retry open times = 0(maximum is 3), network open timeout is 30 seconds, maximum DNS query times is 5
-    print("network.set_dns_timeout_param()=", result, "\r\n");
+    logger.log("tcp_client", 0, "network.set_dns_timeout_param()=", result);
 end;
 
 local make_http_post = function(host, url, data)
-    print("Host is ", tostring(host), "\r\n");
-    print("URL is ", tostring(url), "\r\n");
-    print("data is ", tostring(data), "\r\n");
+    logger.log("tcp_client", 0, "Host is ", tostring(host));
+    logger.log("tcp_client", 0, "URL is ", tostring(url));
+    logger.log("tcp_client", 0, "data is ", tostring(data));
     local http_req = "";
     http_req = http_req .. "POST " .. tostring(url) .. " ";
     http_req = http_req .. "HTTP/1.1\r\nHost: ";
@@ -82,15 +84,15 @@ local open_network = function(client_id)
     --Following is a sample of changing some common parameters, it is not required.
     --config_network_common_parameters();
 
-    print("opening network...\r\n");
+    logger.log("tcp_client", 0, "opening network...");
     -- local cid = 1;--0=>use setting of AT+CSOCKSETPN. 1-16=>use self defined cid
     local timeout = 30000;--  '<= 0' means wait for ever; '> 0' is the timeout milliseconds
     local app_handle = network.open(client_id, timeout);--!!! If the PDP for cid is already opened by other app, this will return a reference to the same PDP context.
     if (not app_handle) then
-        print("failed to open network\r\n");
+        logger.log("tcp_client", 0, "failed to open network");
         return;
     end;
-    print("network.open(), app_handle=", app_handle, "\r\n");
+    logger.log("tcp_client", 0, "network.open(), app_handle=", app_handle);
     CLIENT_TO_APP_HANDLE[client_id] = app_handle;
     return app_handle;
 end;
@@ -98,11 +100,11 @@ _M.open_network = open_network;
 
 local client_id_to_app_handle = function(client_id)
     if CLIENT_TO_APP_HANDLE[client_id] then
-        print("Using already created app_handle: ", CLIENT_TO_APP_HANDLE[client_id], " for client: ", client_id, "\r\n");
+        logger.log("tcp_client", 0, "Using already created app_handle: ", CLIENT_TO_APP_HANDLE[client_id], " for client: ", client_id);
         return CLIENT_TO_APP_HANDLE[client_id];
     else
         local app_handle = open_network(client_id);
-        print("Tried to create new app_handle: ", app_handle, "\r\n");
+        logger.log("tcp_client", 0, "Tried to create new app_handle: ", app_handle);
         if app_handle then
             CLIENT_TO_APP_HANDLE[client_id] = app_handle;
         end;
@@ -138,26 +140,26 @@ local send_data = function(client_id, host, port, data)
     local result = false;
     local response = ""
 
-    print ("Client id is: ", client_id, "\r\n");
+    logger.log("tcp_client", 0, "Client id is: ", client_id);
     --local app_handle = CLIENT_TO_APP_HANDLE[client_id];
     local app_handle = client_id_to_app_handle(client_id);
-    print("App handle is: ", app_handle, "\r\n");
+    logger.log("tcp_client", 0, "App handle is: ", app_handle);
     if( not app_handle ) then
-        print("No app handle. Send failed\r\n")
+        logger.log("tcp_client", 30, "No app handle. Send failed")
         return false;
     end;
 
     local network_is_up = check_and_enable_network(app_handle);
     if( not network_is_up ) then
-        print("Network is not up. Send failed.\r\n");
+        logger.log("tcp_client", 30, "Network is not up. Send failed.");
         return false;
     end;
 
     local local_ip_addr = network.local_ip(app_handle);
-    print("local ip address is ", local_ip_addr, "\r\n");
+    logger.log("tcp_client", 0, "local ip address is ", local_ip_addr);
 
     local mtu_value = network.mtu(app_handle);
-    print("MTU is ", mtu_value, " bytes\r\n");
+    logger.log("tcp_client", 0, "MTU is ", mtu_value, " bytes");
 
     --[[
 
@@ -173,9 +175,9 @@ local send_data = function(client_id, host, port, data)
 
   ]]
     
-    print("resolving DNS address...\r\n");
+    logger.log("tcp_client", 0, "resolving DNS address...\r\n");
     local ip_address = network.resolve(host, cid);
-    print("The IP address for ", host, " is ", ip_address, "\r\n");
+    logger.log("tcp_client", 0, "The IP address for ", host, " is ", ip_address);
 
 
 
@@ -190,12 +192,12 @@ local send_data = function(client_id, host, port, data)
     local socket_fd = socket.create(app_handle, SOCK_TCP);
 
     if (not socket_fd or socket_fd < 1) then
-        print("failed to create socket\r\n");
+        logger.log("tcp_client", 30, "failed to create socket");
     elseif (ip_address) then
         --enable keep alive
         socket.keepalive(socket_fd, true);--this depends on network.set_tcp_ka_param() to set KEEP ALIVE interval and maximum check times.
-        print("socket_fd=", socket_fd, "\r\n");
-        print("connecting server...\r\n");
+        logger.log("tcp_client", 0, "socket_fd=", socket_fd);
+        logger.log("tcp_client", 0, "connecting server...");
         local timeout = 30000;--  '<= 0' means wait for ever; '> 0' is the timeout milliseconds
         local connect_result, socket_released = socket.connect(socket_fd, ip_address, port, timeout);
         --[[
@@ -215,42 +217,41 @@ local send_data = function(client_id, host, port, data)
     
 
      ]]
-        print("socket.connect = [result=", connect_result, ",socket_released=", socket_released, "]\r\n");
+        logger.log("tcp_client", 0, "socket.connect = [result=", connect_result, ",socket_released=", socket_released, "]\r\n");
         if (not connect_result) then
-            print("failed to connect server\r\n");
+            logger.log("tcp_client", 30, "failed to connect server");
         else
-            print("connect server succeeded\r\n");
+            logger.log("tcp_client", 0, "connect server succeeded");
             socket.select(socket_fd, SOCK_CLOSE_EVENT);--care for close event
             -- local http_req = "POST /process_update HTTP/1.1\r\nHost: www.scattym.com\r\nUser-Agent: Mozilla/5.0 (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\nAccept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\nKeep-Alive: 115\r\nConnection: keep-alive\r\n\r\n";
-            print("socket.send..., len=", string.len(data), "\r\n");
+            logger.log("tcp_client", 0, "socket.send..., len=", string.len(data));
             local timeout = 30000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
             local err_code, sent_len = socket.send(socket_fd, data, timeout);
-            print("socket.send ", err_code, ", ", sent_len, "\r\n");
+            logger.log("tcp_client", 0, "socket.send ", err_code, ", ", sent_len);
             local http_resp = ""
             if (err_code and (err_code == SOCK_RST_OK)) then
-                print("socket.recv()...\r\n");
+                logger.log("tcp_client", 0, "socket.recv()...");
                 local timeout = 15000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
 
                 while( err_code ~= SOCK_CLOSE_EVENT ) do
                     err_code, fragment = socket.recv(socket_fd, timeout);
-                    print("socket.recv(), err_code=", err_code, "\r\n");
+                    logger.log("tcp_client", 0, "socket.recv(), err_code=", err_code);
                     if( fragment ) then
-                        print("Fragment is ", fragment, "\r\n")
+                        logger.log("tcp_client", 0, "Fragment is ", fragment)
                         response = response .. fragment
                     end
                 end
-                print("c(", client_id , "):Error code is now: ", err_code, "\r\n")
+                logger.log("tcp_client", 0, "c(", client_id , "):Error code is now: ", err_code)
                 if ( response ) then
                     result = true;
                 end;
-                print("\r\n");
             end;
         end;
-        print("closing socket...\r\n");
+        logger.log("tcp_client", 0, "closing socket...");
         if (not socket_released and not socket.close(socket_fd)) then
-            print("failed to close socket\r\n");
+            logger.log("tcp_client", 30, "failed to close socket");
         else
-            print("close socket succeeded\r\n");
+            logger.log("tcp_client", 0, "close socket succeeded");
         end;
     end;
     collectgarbage();
@@ -262,11 +263,11 @@ local close_network = function(client_id)
     local app_handle = CLIENT_TO_APP_HANDLE[client_id];
     if app_handle then
         set_network_dormant(app_handle);
-        print("closing network...\r\n");
+        logger.log("tcp_client", 0, "closing network...");
         local result = network.close(app_handle);
-        print("network.close(), result=", result, "\r\n");
+        logger.log("tcp_client", 0, "network.close(), result=", result);
     else
-        print("No app handle for client id: ", client_id, "\r\n")
+        logger.log("tcp_client", 30, "No app handle for client id: ", client_id)
     end;
     CLIENT_TO_APP_HANDLE[client_id] = nil
     return result;
@@ -276,14 +277,14 @@ _M.close_network = close_network;
 local open_send_close_tcp = function(client_id, host, port, data)
 
     app_handle = open_network(client_id)
-    print("App handle is ", tostring(app_handle), "\r\n")
+    logger.log("tcp_client", 0, "App handle is ", tostring(app_handle))
     if( app_handle ) then
         result, response = send_data(app_handle, host, port, data);
         close_network(app_handle);
         collectgarbage();
         return result, response;
     else
-        print("Invalid app handle returned: ", app_handle, "\r\n");
+        logger.log("tcp_client", 30, "Invalid app handle returned: ", app_handle);
     end;
     collectgarbage();
     return false, "";
@@ -297,15 +298,15 @@ local parse_http_headers = function(response)
     local headers = {}
     headers["response_code"] = "000"
     for line in response:gmatch("([^\r\n]*)\r\n?") do
-        print("Line is ", line, "\r\n")
+        logger.log("tcp_client", 0, "Line is ", line)
 
         local type, code, msg = line:match("([Hh][Tt][Tt][Pp]/[0-9].[0-9])%s+([0-9]*)%s+(.*)")
         if( type and code and msg ) then
-            print("Type: ", type, " code: ", code, " msg: ", msg, "\r\n")
+            logger.log("tcp_client", 0, "Type: ", type, " code: ", code, " msg: ", msg)
             headers["response_code"] = code
         else
             for key, value in line:gmatch("(%S*):%s*(.*)") do
-                print("key is ", key, " value is ", value, "\r\n")
+                logger.log("tcp_client", 0, "key is ", key, " value is ", value)
                 if( key and value ) then
                     headers[key] = value
                 end
@@ -313,7 +314,7 @@ local parse_http_headers = function(response)
             end
         end
     end
-    print("Finished parsing headers\r\n")
+    logger.log("tcp_client", 0, "Finished parsing headers")
     collectgarbage()
     return headers
 end
@@ -328,24 +329,23 @@ local parse_http_response = function (buffer)
     local _, HeaderLength = buffer:find('\r\n\r\n')
     local ContentLength = buffer:match("Content%-Length:%s(%d+)\r\n")
     if (not ContentLength or not HeaderLength) then
-        print('Badly formed HTTP response.\r\n'..buffer)
+        logger.log("tcp_client", 30, 'Badly formed HTTP response.'..buffer)
         return {}, ""
     end
     local ExpectedLength = TotalLength(HeaderLength, ContentLength)
     if (#buffer < ExpectedLength) then
-        print("Bad length\r\n")
-        return ""
+        logger.log("tcp_client", 30, "Bad content length field. Expected: ", ExpectedLength, " but got", #buffer)
+        return {}, ""
     end
 
 
-    print("Preparing header buffer\r\n")
+    logger.log("tcp_client", 0, "Preparing header buffer")
     local header_buf = buffer:sub(1, HeaderLength)
-    print("Parsing headers\r\n")
+    logger.log("tcp_client", 0, "Parsing headers")
     local headers = parse_http_headers(header_buf)
-    print("Extracting payload\r\n")
+    logger.log("tcp_client", 0, "Extracting payload")
     payload = buffer:sub(HeaderLength+1, HeaderLength+ContentLength)
-    --print("Payload is >", payload, "<\r\n")
-    print("Mem usage: ", tostring(getcurmem()), "\r\n")
+    --logger.log("tcp_client", 0, "Payload is >", payload, "<\r\n")
     collectgarbage()
     return headers, payload
 end
@@ -354,8 +354,9 @@ end
 local http_open_send_close = function(client_id, host, port, url, data)
 
     if( not client_id ) then
-        print("Invalid client id: ", client_id, "\r\n");
+        logger.log("tcp_client", 30, "Invalid client id: ", client_id);
     else
+        logger.log("tcp_client", 20, "Callout to http://", host, ":", port, url)
         result, response = send_data(client_id, host, port, make_http_post(host, url, data));
         if( result and response ) then
             headers, payload = parse_http_response(response);
