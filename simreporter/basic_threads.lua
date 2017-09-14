@@ -77,7 +77,7 @@ function gps_tick()
             current_loop = current_loop + 1
 
             local cell_table = device.get_device_info_table();
-            local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, NMEA_LOOP_COUNT);
+            local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
             local result, headers, payload = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/v2/process_update", encapsulated_payload);
             if result and headers["response_code"] == "200" then
                 update_last_cell_report();
@@ -89,7 +89,7 @@ function gps_tick()
                 logger.log("basic_threads", 10, "nmea_data, len=", string.len(nmea_data));
                 local nmea_table = {}
                 nmea_table["nmea"] = nmea_data
-                local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, NMEA_LOOP_COUNT);
+                local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
 
                 local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/v2/process_cell_update", encapsulated_payload);
                 logger.log("basic_threads", 10, "Result is ", tostring(result), " and response is ", response);
