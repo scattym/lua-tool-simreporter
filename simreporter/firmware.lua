@@ -33,7 +33,9 @@ function get_firmware(imei, version)
         local firmware_json = json.decode(response);
         tcp.close_network(client_id);
         logger.log("firmware", 10, firmware_json);
-        if( is_version_quarantined(firmware_json["version"]) ) then
+        if not firmware_json then
+            logger.log("firmware", 10, "Unable to load firmware json")
+        elseif( is_version_quarantined(firmware_json["version"]) ) then
             logger.log("firmware", 10, "Version ", firmware_json["version"], " is already quarantined, not expanding")
         else
             if( firmware_json["version"] and firmware_json["file"] and firmware_json["checksum"] ) then

@@ -18,11 +18,15 @@ printdir(1);
 quarantine_version = function(version)
     print("Quarantining version: ", version, "\r\n")
     if version and not string.equal(version, "base") then
-        file = io.open("c:/quarantined","a") assert(file)
-        -- file:trunc(0)
-        result = file:write(version, "\n")
-        print("File write result: ", result, "\r\n")
-        file:close()
+        file = io.open("c:/quarantined","a")
+        if not file then
+            print("Unable to open quarantined file\r\n")
+        else
+            -- file:trunc(0)
+            result = file:write(version, "\n")
+            print("File write result: ", result, "\r\n")
+            file:close()
+        end
     end
 end
 
