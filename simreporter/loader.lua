@@ -52,6 +52,24 @@ is_version_quarantined = function(version)
     return false
 end
 
+local delete_dir = function(directory)
+    if string.equal(directory:lower(), "c:/") then
+        print("Can't remove root directory\r\n")
+        return false
+    elseif string.equal(directory:lower(), "c:/base") then
+        print("Can't remove root directory\r\n")
+        return false
+    end
+    local dir_list, file_list = os.lsdir("c:/libs/"..version.."/")
+    for i, dir in ipairs(dir_list) do 
+        delete_dir()
+    for i, file in ipairs(file_list) do
+        print("Deleting file: ", "c:/libs/"..version.."/"..file, "\r\n")
+        local file_delete = os.delfile("c:/libs/"..version.."/"..file)
+        print("File delete result: ", file_delete, "\r\n")
+    end
+end
+
 local pick_version = function()
 
     local dir_list, file_list = os.lsdir("c:/libs/")
@@ -59,7 +77,7 @@ local pick_version = function()
     print("Starting\r\n")
     for i, directory in ipairs(dir_list) do
         print("Checking directory: ", directory, "\r\n")
-        version = tonumber(directory)
+        local version = tonumber(directory)
         print("version is: ", version, "\r\n")
         if not version then
             print("Unable to convert ", directory, " to a version number\r\n")
