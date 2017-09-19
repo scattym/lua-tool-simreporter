@@ -14,7 +14,7 @@ local unzip_file = function(zipfile, output_dir)
     while( true ) do
         local filename, filesize, crypted = miniunz.get_current_entry_info(zip_handle)
         if( filename ) then
-            print("filname: ", filename, " size: ", filesize, "\r\n")
+            print("filename: ", filename, " size: ", filesize, "\r\n")
         else
             print("failed to get entry\r\n")
         end
