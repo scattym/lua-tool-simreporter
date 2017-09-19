@@ -12,7 +12,7 @@ function prequire(...)
     return nil
 end
 DEBUG_LEVEL = 10
-vmsleep(3000);
+vmsleep(30000);
 printdir(1);
 
 quarantine_version = function(version)
@@ -53,21 +53,54 @@ is_version_quarantined = function(version)
 end
 
 local delete_dir = function(directory)
+    print("Removing directory: ", directory, "\r\n")
+    if directory[#directory] ~= "/" then
+        directory = directory .. "/"
+    end
     if string.equal(directory:lower(), "c:/") then
         print("Can't remove root directory\r\n")
         return false
-    elseif string.equal(directory:lower(), "c:/base") then
-        print("Can't remove root directory\r\n")
+    elseif string.equal(directory:lower(), "c:/libs/base/") then
+        print("Can't remove base libs directory\r\n")
         return false
     end
-    local dir_list, file_list = os.lsdir("c:/libs/"..version.."/")
-    for i, dir in ipairs(dir_list) do 
-        delete_dir()
+    local dir_list, file_list = os.lsdir(directory)
+    for i, dir in ipairs(dir_list) do
+        print("Calling out to delete directory: ", directory, dir, "/\r\n")
+        delete_dir(directory .. dir .. "/")
+    end
     for i, file in ipairs(file_list) do
-        print("Deleting file: ", "c:/libs/"..version.."/"..file, "\r\n")
-        local file_delete = os.delfile("c:/libs/"..version.."/"..file)
+        print("Deleting file: ", directory, file, "\r\n")
+        local file_delete = os.delfile(directory .. file)
         print("File delete result: ", file_delete, "\r\n")
     end
+    local dir_delete = os.rmdir(directory)
+    print("Directory delete result: ", dir_delete, "\r\n")
+end
+
+local compile_files_if_needed = function(directory)
+    sio.send("AT+FSCD=" .. directory .. "\r\n")
+    rsp = sio.recv(5000)
+    print("Change directory response was ", rsp, "\r\n")
+    local dir_list, file_list = os.lsdir(directory)
+    for i, file in ipairs(file_list) do
+        if string.match(file, "lua") then
+            print("Compiling file: ", directory, file, "\r\n" )
+            local cmd = 'AT+CSCRIPTCL="' .. file .. '"\r\n'
+            sio.send(cmd)
+            rsp = sio.recv(5000)
+            print("Compile response was ", rsp, "\r\n")
+            if rsp:match("ERROR") then
+                print("Failed so not deleting\r\n")
+            else
+                os.delfile(directory .. file)
+            end
+        end
+    end
+    sio.send("AT+FSCD=c:/\r\n")
+    rsp = sio.recv(5000)
+    print("Change directory response was ", rsp, "\r\n")
+
 end
 
 local pick_version = function()
@@ -85,17 +118,10 @@ local pick_version = function()
             if not max_version or version > max_version then
                 if( is_version_quarantined(version) ) then
                     print("version is quarantined. Deleting files.\r\n")
-                    local dir_list, file_list = os.lsdir("c:/libs/"..version.."/")
-                    for i, file in ipairs(file_list) do
-                        print("Deleting file: ", "c:/libs/"..version.."/"..file, "\r\n")
-                        local file_delete = os.delfile("c:/libs/"..version.."/"..file)
-                        print("File delete result: ", file_delete, "\r\n")
-                    end
-                    print("Deleting directory: ", "c:/libs/"..version.."/", "\r\n")
-                    local dir_delete = os.rmdir("c:/libs/"..version.."/")
-                    print("Directory delete result: ", dir_delete, "\r\n")
+                    delete_dir("c:/libs/" .. version .. "/")
                 else
-                    print("max version now set to: ", max_version, "\r\n")
+                    print("max version now set to: ", version, "\r\n")
+                    compile_files_if_needed("c:/libs/" .. version .. "/")
                     max_version = version
                 end
             end
