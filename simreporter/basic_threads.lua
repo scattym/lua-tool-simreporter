@@ -45,7 +45,6 @@ end;
 
 
 function wait_until_lock(iterations)
-    local gps_info = nil
     for i=1,iterations do
         local is_locked = at_abs.is_location_valid();
         if is_locked then
@@ -96,6 +95,7 @@ function gps_tick()
             end;
             collectgarbage();
             thread.sleep(config.get_config_value("NMEA_SLEEP_TIME"));
+            max_loop_count = config.get_config_value("NMEA_LOOP_COUNT") -- Ensure we exit if config changes
         end;
         tcp.close_network(client_id);
         logger.log("basic_threads", 10, "Turning gps off");
