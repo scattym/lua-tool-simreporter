@@ -24,7 +24,7 @@ local operator_to_network_setup = function(sim_operator)
             return network_string
         end
     end
-    logger.log("network_setup", 30, "Operator not found, returning fall back parameters")
+    logger.log("network_setup", 30, "Operator ", sim_operator, " not found, returning fall back parameters")
     return fallback
 end
 
