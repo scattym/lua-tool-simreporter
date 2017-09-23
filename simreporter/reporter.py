@@ -51,7 +51,7 @@ def file_is_newer_than(file1, file2):
     return True
 
 
-def transfer_and_build_files(directory, initial_reset, force_all_files):
+def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader):
     try:
         set_autorun(serial_port, False)
         if initial_reset:
@@ -60,7 +60,7 @@ def transfer_and_build_files(directory, initial_reset, force_all_files):
             while "START" not in response:
                 print("Waiting for module to start.")
                 response = get_response(serial_port, 2)
-            time.sleep(16)
+            time.sleep(13)
             print("Module now ready.")
         else:
             print("Not resetting. Be sure the script is not running.")
@@ -100,13 +100,15 @@ def transfer_and_build_files(directory, initial_reset, force_all_files):
             delete_file(serial_port, filename)
     
         change_dir(serial_port, "c:/")
-        with open("loader.lua", 'r') as content_file:
-            content = content_file.read()
-            put_file(serial_port, "c:/loader.lua", content)
-        compile_file(serial_port, "loader.lua")
-        delete_file(serial_port, "autorun.out")
-        delete_file(serial_port, "loader.lua")
-    
+        if send_loader:
+            with open("loader.lua", 'r') as content_file:
+                content = content_file.read()
+                put_file(serial_port, "c:/loader.lua", content)
+            compile_file(serial_port, "loader.lua")
+            delete_file(serial_port, "autorun.out")
+            delete_file(serial_port, "loader.lua")
+            copy_file(serial_port, "loader.out", "autorun.out")
+
         # compile_file(module, "reporter.lua")
         ls(serial_port)
     
@@ -120,8 +122,7 @@ def transfer_and_build_files(directory, initial_reset, force_all_files):
         #    get_response(module, 2)
         #    get_response(module, 2)
         #    run_script(module, "nmea_getinfo.out")
-        copy_file(serial_port, "loader.out", "autorun.out")
-    
+
         # getresponse(module, 1)
     
         set_autorun(serial_port, True)
@@ -159,6 +160,13 @@ if __name__ == '__main__':
         action="store_true"
     )
     parser.add_argument(
+        '-l',
+        '--loader',
+        help="Also update the loader.",
+        default=False,
+        action="store_true"
+    )
+    parser.add_argument(
         '-n',
         '--no-initial-reset',
         help="The target directory in libs. Defaults to base.",
@@ -185,4 +193,4 @@ if __name__ == '__main__':
     if args.zip_files:
         zip_files()
     else:
-        transfer_and_build_files(args.directory, not args.no_initial_reset, args.force_all_files)
+        transfer_and_build_files(args.directory, not args.no_initial_reset, args.force_all_files, args.loader)

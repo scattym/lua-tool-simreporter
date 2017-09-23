@@ -45,7 +45,6 @@ end;
 
 
 function wait_until_lock(iterations)
-    local gps_info = nil
     for i=1,iterations do
         local is_locked = at_abs.is_location_valid();
         if is_locked then
@@ -77,8 +76,8 @@ function gps_tick()
             current_loop = current_loop + 1
 
             local cell_table = device.get_device_info_table();
-            local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, NMEA_LOOP_COUNT);
-            local result, headers, payload = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/v2/process_update", encapsulated_payload);
+            local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
+            local result, headers, payload = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload);
             if result and headers["response_code"] == "200" then
                 update_last_cell_report();
             end;
@@ -89,13 +88,14 @@ function gps_tick()
                 logger.log("basic_threads", 10, "nmea_data, len=", string.len(nmea_data));
                 local nmea_table = {}
                 nmea_table["nmea"] = nmea_data
-                local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, NMEA_LOOP_COUNT);
+                local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
 
-                local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/v2/process_cell_update", encapsulated_payload);
+                local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("GPS_PATH"), encapsulated_payload);
                 logger.log("basic_threads", 10, "Result is ", tostring(result), " and response is ", response);
             end;
             collectgarbage();
             thread.sleep(config.get_config_value("NMEA_SLEEP_TIME"));
+            max_loop_count = config.get_config_value("NMEA_LOOP_COUNT") -- Ensure we exit if config changes
         end;
         tcp.close_network(client_id);
         logger.log("basic_threads", 10, "Turning gps off");
@@ -117,7 +117,7 @@ function cell_tick()
             for i=1,1 do
                 local cell_table = device.get_device_info_table();
                 local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, config.get_config_value("NMEA_LOOP_COUNT"));
-                local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/v2/process_update", encapsulated_payload);
+                local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload);
                 logger.log("basic_threads", 10, "Result is ", tostring(result), " and response is ", response);
                 if result and headers["response_code"] == "200" then
                     update_last_cell_report();
@@ -129,7 +129,7 @@ function cell_tick()
         else
             logger.log("basic_threads", 10, "Cell data has already been reported at ", tostring(last_cell_report));
         end
-        logger.log("basic_threads", 10, "Cell data thread sleeping for ", config.get_config_value("CELL_THREAD_SLEEP_TIME") / 1000, " seconds\r\n");
+        logger.log("basic_threads", 10, "Cell data thread sleeping for ", config.get_config_value("CELL_THREAD_SLEEP_TIME") / 1000, " seconds");
         collectgarbage();
         thread.sleep(config.get_config_value("CELL_THREAD_SLEEP_TIME"));
     end;
@@ -142,8 +142,29 @@ function get_firmware_version()
     local client_id = 3;
     while (true) do
         firmware.check_firmware_and_maybe_update(imei, running_version)
+        collectgarbage()
         thread.sleep(config.get_config_value("FIRMWARE_SLEEP_TIME"));
     end
+end
+
+function get_config()
+    logger.log("basic_threads", 10, "Trying to retrieve config");
+    logger.log("basic_threads", 10, "imei: ", imei)
+    logger.log("basic_threads", 10, "imei: ", running_version)
+    while (true) do
+        local config_result = config.load_config_from_server(imei, running_version)
+        logger.log("basic_threads", 10, "Config load result was: ", config_result)
+        logger.log("basic_threads", 10, "mem used: ", getcurmem())
+        config.dump_config()
+        collectgarbage()
+        thread.sleep(config.get_config_value("CONFIG_SLEEP_TIME"));
+    end
+end
+
+local function tohex(data)
+    return (data:gsub(".", function (x)
+        return ("%02x"):format(x:byte()) end)
+    )
 end
 
 local start_threads = function (version)
@@ -152,16 +173,18 @@ local start_threads = function (version)
     --logger.log("basic_threads", 10, "Trying to load config first time\r\n")
     --local config_load_result = config.load_config_from_file()
     --logger.log("basic_threads", 10, "Config load result is ", config_load_result, "\r\n")
-    logger.log("basic_threads", 10, "Trying to save config to file")
-    local config_save_result = config.save_config_to_file()
-    logger.log("basic_threads", 10, "Save config result is ", config_save_result)
+    --logger.log("basic_threads", 10, "Trying to save config to file")
+    --local config_save_result = config.save_config_to_file()
+    --logger.log("basic_threads", 10, "Save config result is ", config_save_result)
 
     local gps_tick_thread = thread.create(gps_tick);
     local cell_tick_thread = thread.create(cell_tick);
     local firmware_check_thread = thread.create(get_firmware_version);
-    logger.log("basic_threads", 10, tostring(gps_tick_thread));
-    logger.log("basic_threads", 10, tostring(cell_tick_thread));
-    logger.log("basic_threads", 10, tostring(firmware_check_thread));
+    local config_update_thread = thread.create(get_config);
+    logger.log("basic_threads", 10, "GPS tick thread: ", tostring(gps_tick_thread));
+    logger.log("basic_threads", 10, "cell_tick_thread: ", tostring(cell_tick_thread));
+    logger.log("basic_threads", 10, "Firmware check thread: ", tostring(firmware_check_thread));
+    logger.log("basic_threads", 10, "Config update thread: ", tostring(config_update_thread));
     thread.sleep(1000);
     logger.log("basic_threads", 10, "Starting threads");
     result = thread.run(gps_tick_thread);
@@ -170,23 +193,53 @@ local start_threads = function (version)
     logger.log("basic_threads", 10, "Cell data start thread result is ", tostring(result));
     result = thread.run(firmware_check_thread);
     logger.log("basic_threads", 10, "Firmware check start thread result is ", tostring(result));
+    result = thread.run(config_update_thread);
+    logger.log("basic_threads", 10, "Config update start thread result is ", tostring(result));
 
     logger.log("basic_threads", 10, "Threads are running");
     local counter = 0
-    while (thread.running(gps_tick_thread) or thread.running(cell_tick_thread)) do
-        logger.log("basic_threads", 10, "Still running");
-        thread.sleep(config.get_config_value("MAIN_THREAD_SLEEP"));
+    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) do
+    --while thread.running(config_update_thread) do
+        logger.log("basic_threads", 10, "All threads still running");
+        logger.log("basic_threads", 10, "Peak memory used: ", getpeakmem());
         counter = counter+1;
-        if( config.get_config_value("MAX_MAIN_THREAD_LOOP_COUNT") > 0 and counter > config.get_config_value("MAX_MAIN_THREAD_LOOP_COUNT")) then
+        local main_thread_loop_count = config.get_config_value("MAX_MAIN_THREAD_LOOP_COUNT")
+        if( main_thread_loop_count > 0 and counter > main_thread_loop_count) then
             thread.stop(gps_tick_thread);
             thread.stop(cell_tick_thread);
             thread.stop(firmware_check_thread);
+            thread.stop(config_update_thread);
             gps.gpsclose();
             break;
         end;
+
+        --[[
+        --local hosts = {6, 7, 16, 17 }
+        local hosts = {6, 7}
+        for _,i in ipairs(hosts) do
+        --for i=1,127 do
+            for j=1,32 do
+                local data = i2c.read_i2c_dev(i, j, 4)
+                local hex = ""
+                if data ~= false then
+                    hex = string.format("%x", data)
+                end
+                logger.log("basic_threads", 30, "", i, ":", data, ":", hex)
+                thread.sleep(200)
+            end
+        end
+        ]]--
         collectgarbage();
+        logger.log("basic_threads", 30, "Main thread sleeping")
+        thread.sleep(config.get_config_value("MAIN_THREAD_SLEEP"));
     end;
-    logger.log("basic_threads", 30, "All sub-threads ended. Resetting device");
+    logger.log("basic_threads", 30, "One of the threads is not running or reached max loop count.");
+    logger.log("basic_threads", 30, "GPS tick thread running: ", thread.running(gps_tick_thread));
+    logger.log("basic_threads", 30, "cell_tick_thread running: ", thread.running(cell_tick_thread));
+    logger.log("basic_threads", 30, "Firmware check thread running: ", thread.running(firmware_check_thread));
+    logger.log("basic_threads", 30, "Config update thread running: ", thread.running(config_update_thread));
+    logger.log("basic_threads", 30, "Loop counter: ", counter);
+    thread.sleep(2000)
     at.reset()
 end;
 

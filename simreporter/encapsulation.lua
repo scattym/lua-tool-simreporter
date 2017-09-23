@@ -2,6 +2,8 @@
 
 local _M = {}
 
+local json = require("json")
+
 local add_field = function(data, key, value, type)
     local return_str = data
     if( return_str ~= "" ) then

@@ -6,7 +6,7 @@ local logger = require("logging")
 local _M = {}
 
 local CLIENT_TO_APP_HANDLE = {}
-logger.create_logger("tcp_client", 0)
+logger.create_logger("tcp_client", 30)
 
 function check_and_enable_network(app_handle)
     logger.log("tcp_client", 0, "check_network_dorm_function, app_handle: " , app_handle);
@@ -93,23 +93,28 @@ local open_network = function(client_id)
         return;
     end;
     logger.log("tcp_client", 0, "network.open(), app_handle=", app_handle);
+    thread.enter_cs(5)
     CLIENT_TO_APP_HANDLE[client_id] = app_handle;
+    thread.leave_cs(5)
     return app_handle;
 end;
 _M.open_network = open_network;
 
-local client_id_to_app_handle = function(client_id)
+local client_id_to_app_handle = function(client_id, create_if_not_exists)
+    thread.enter_cs(5)
+    local app_handle
     if CLIENT_TO_APP_HANDLE[client_id] then
         logger.log("tcp_client", 0, "Using already created app_handle: ", CLIENT_TO_APP_HANDLE[client_id], " for client: ", client_id);
-        return CLIENT_TO_APP_HANDLE[client_id];
-    else
+        app_handle = CLIENT_TO_APP_HANDLE[client_id];
+    elseif create_if_not_exists then
         local app_handle = open_network(client_id);
         logger.log("tcp_client", 0, "Tried to create new app_handle: ", app_handle);
-        if app_handle then
-            CLIENT_TO_APP_HANDLE[client_id] = app_handle;
-        end;
-        return app_handle;
+    else
+        logger.log("tcp_client", 0, "No app handle to return for client: ", client_id);
     end;
+    thread.leave_cs(5)
+    return app_handle
+
 end;
 
 --[[
@@ -142,7 +147,7 @@ local send_data = function(client_id, host, port, data)
 
     logger.log("tcp_client", 0, "Client id is: ", client_id);
     --local app_handle = CLIENT_TO_APP_HANDLE[client_id];
-    local app_handle = client_id_to_app_handle(client_id);
+    local app_handle = client_id_to_app_handle(client_id, true);
     logger.log("tcp_client", 0, "App handle is: ", app_handle);
     if( not app_handle ) then
         logger.log("tcp_client", 30, "No app handle. Send failed")
@@ -260,7 +265,7 @@ end
 _M.send_data = send_data;
 
 local close_network = function(client_id)
-    local app_handle = CLIENT_TO_APP_HANDLE[client_id];
+    local app_handle = client_id_to_app_handle(client_id, false)
     if app_handle then
         set_network_dormant(app_handle);
         logger.log("tcp_client", 0, "closing network...");
@@ -269,7 +274,9 @@ local close_network = function(client_id)
     else
         logger.log("tcp_client", 30, "No app handle for client id: ", client_id)
     end;
+    thread.enter_cs(5)
     CLIENT_TO_APP_HANDLE[client_id] = nil
+    thread.leave_cs(5)
     return result;
 end;
 _M.close_network = close_network;
