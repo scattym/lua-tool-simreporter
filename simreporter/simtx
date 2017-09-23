@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+from atlib import *
+import time
+import os
+import os.path
+import argparse
+
+# module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
+# module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
+
+def transfer_files(port, directory, *args):
+    try:
+        serial_port = serial.serial_for_url("rfc2217://10.1.1.5:" + port, 115200, timeout=5)
+        if directory:
+            change_dir(serial_port, directory)
+        else:
+            change_dir(serial_port, "c:/")
+
+        for filename in args:  # os.listdir("."):
+            if os.path.isfile(filename):
+                print "Putting file " + filename
+                with open(filename, 'r') as content_file:
+                    content = content_file.read()
+                    put_file(serial_port, directory + "/" + os.path.basename(filename), content)
+    
+    finally:
+        serial_port.close()
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    
+    parser.add_argument(
+        '-p',
+        '--port',
+        help="The port of the serial device to connect to.",
+        default="9991",
+    )
+    parser.add_argument(
+        '-f',
+        '--filename',
+        help="The filename of the file to transfer to the device.",
+        required=True,
+    )
+    parser.add_argument(
+        '-d',
+        '--directory',
+        help="The directory on the device to transfer the file to.",
+        default="c:/",
+    )
+    args = parser.parse_args()
+
+    transfer_files(args.port, args.directory, args.filename)
