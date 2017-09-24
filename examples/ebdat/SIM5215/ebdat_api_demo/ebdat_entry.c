@@ -33,7 +33,7 @@
 #define __ARMCC_VERSION 1200
 #endif
 
-#include ".\inc\cust_header.h"
+#include "inc/cust_header.h"
 
 /*-------------------------------------------------------------------------------------*/
 /*        MACRO                                                                                                     */

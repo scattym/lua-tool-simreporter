@@ -71,7 +71,7 @@ extern "C" {
 
 typedef  unsigned char      boolean;     /* Boolean value type. */
 
-typedef  unsigned __int64  uint64;      /* Unsigned 64 bit value */
+//typedef  unsigned __int64  uint64;      /* Unsigned 64 bit value */
 
 typedef  unsigned long int  uint32;      /* Unsigned 32 bit value */
 

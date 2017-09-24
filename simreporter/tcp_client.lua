@@ -2,6 +2,7 @@
 --require "network"
 --local socket = require("simsocket")
 local logger = require("logging")
+local aeslib = require("aes")
 
 local _M = {}
 
@@ -59,7 +60,7 @@ function config_network_common_parameters()
     logger.log("tcp_client", 0, "network.set_dns_timeout_param()=", result);
 end;
 
-local make_http_post = function(host, url, data)
+local make_http_post = function(host, url, data, headers)
     logger.log("tcp_client", 0, "Host is ", tostring(host));
     logger.log("tcp_client", 0, "URL is ", tostring(url));
     logger.log("tcp_client", 0, "data is ", tostring(data));
@@ -72,6 +73,10 @@ local make_http_post = function(host, url, data)
     http_req = http_req .. "Authorization: bc733796ca38178dbee79f68ba4271e97fe170d4\r\n";
     http_req = http_req .. "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n";
     http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n";
+    for key, value in pairs(headers) do
+        http_req = http_req .. key .. ": " .. value .. "\r\n"
+    end
+    http_req = http_req .. "Content-Type: application/octet-stream\r\n";
     http_req = http_req .. "Connection: close\r\n";
     http_req = http_req .. "Content-Length: " .. string.len(tostring(data)) .. "\r\n";
     http_req = http_req .. "\r\n";
@@ -83,36 +88,35 @@ end
 local open_network = function(client_id)
     --Following is a sample of changing some common parameters, it is not required.
     --config_network_common_parameters();
-
-    logger.log("tcp_client", 0, "opening network...");
+    logger.log("tcp_client", 0, "opening network for client id " .. client_id);
+    thread.enter_cs(5)
     -- local cid = 1;--0=>use setting of AT+CSOCKSETPN. 1-16=>use self defined cid
     local timeout = 30000;--  '<= 0' means wait for ever; '> 0' is the timeout milliseconds
     local app_handle = network.open(client_id, timeout);--!!! If the PDP for cid is already opened by other app, this will return a reference to the same PDP context.
     if (not app_handle) then
-        logger.log("tcp_client", 0, "failed to open network");
+        logger.log("tcp_client", 30, "failed to open network for client id " .. tostring(client_id));
         return;
     end;
     logger.log("tcp_client", 0, "network.open(), app_handle=", app_handle);
-    thread.enter_cs(5)
-    CLIENT_TO_APP_HANDLE[client_id] = app_handle;
+        CLIENT_TO_APP_HANDLE[client_id] = app_handle;
     thread.leave_cs(5)
     return app_handle;
 end;
 _M.open_network = open_network;
 
 local client_id_to_app_handle = function(client_id, create_if_not_exists)
-    thread.enter_cs(5)
     local app_handle
     if CLIENT_TO_APP_HANDLE[client_id] then
+        thread.enter_cs(5)
         logger.log("tcp_client", 0, "Using already created app_handle: ", CLIENT_TO_APP_HANDLE[client_id], " for client: ", client_id);
         app_handle = CLIENT_TO_APP_HANDLE[client_id];
+        thread.leave_cs(5)
     elseif create_if_not_exists then
         local app_handle = open_network(client_id);
         logger.log("tcp_client", 0, "Tried to create new app_handle: ", app_handle);
     else
         logger.log("tcp_client", 0, "No app handle to return for client: ", client_id);
     end;
-    thread.leave_cs(5)
     return app_handle
 
 end;
@@ -197,7 +201,7 @@ local send_data = function(client_id, host, port, data)
     local socket_fd = socket.create(app_handle, SOCK_TCP);
 
     if (not socket_fd or socket_fd < 1) then
-        logger.log("tcp_client", 30, "failed to create socket");
+        logger.log("tcp_client", 30, "failed to create socket. socket_fd is ", tostring(socket_fd));
     elseif (ip_address) then
         --enable keep alive
         socket.keepalive(socket_fd, true);--this depends on network.set_tcp_ka_param() to set KEEP ALIVE interval and maximum check times.
@@ -358,17 +362,34 @@ local parse_http_response = function (buffer)
 end
 
 
-local http_open_send_close = function(client_id, host, port, url, data)
+local http_open_send_close = function(client_id, host, port, url, data, headers, encrypt)
+    if not headers then
+        headers = {}
+    end
+    if encrypt then
+        headers["encrypted"] = "true"
+    end
+    local payload = ""
+    if encrypt and data ~= nil and data ~= "" then
+        logger.log("tcp_client", 0, "About to encrypt payload");
+        -- encrypt(password, data, keyLength, mode, iv)
+        payload = aeslib.encrypt("password", data, aeslib.AES128, aeslib.CBCMODE)
+        --payload = data
+        logger.log("tcp_client", 0, "Encrypted payload is " .. tostring(payload));
+    else
+        payload = data
+        logger.log("tcp_client", 0, "Not encrypting " .. tostring(payload));
+    end
 
     if( not client_id ) then
         logger.log("tcp_client", 30, "Invalid client id: ", client_id);
     else
         logger.log("tcp_client", 20, "Callout to http://", host, ":", port, url)
-        result, response = send_data(client_id, host, port, make_http_post(host, url, data));
+        result, response = send_data(client_id, host, port, make_http_post(host, url, payload, headers));
         if( result and response ) then
-            headers, payload = parse_http_response(response);
+            local headers, response_payload = parse_http_response(response);
             collectgarbage();
-            return result, headers, payload;
+            return result, headers, response_payload;
         end
     end;
     collectgarbage();

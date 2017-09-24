@@ -13,6 +13,7 @@ serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9991", 115200, timeout=5
 VERSION = "201709141"
 
 files = [
+    "aes.lua",
     "at_abs.lua",
     "at_commands.lua",
     "basic_threads.lua",
@@ -51,7 +52,7 @@ def file_is_newer_than(file1, file2):
     return True
 
 
-def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader):
+def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader, only_file):
     try:
         set_autorun(serial_port, False)
         if initial_reset:
@@ -74,20 +75,21 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
         compile_files = []
 
         for filename in files:  # os.listdir("."):
-            if os.path.isfile(filename):
-                if "lua" in filename:
-                    if file_is_newer_than(filename, "lastupload/" + filename) or force_all_files:
-                        print "Putting file " + filename
-                        with open(filename, 'r') as content_file:
-                            content = content_file.read()
-                            put_file(serial_port, "c:/libs/" + directory + "/" + filename, content)
-                            # delete_file(module, file)
-                        touch("lastupload/" + filename)
-                        compile_files.append(filename)
-                    else:
-                        print("File %s is not newer than last uploaded version" % (
-                            filename
-                        ))
+            if only_file is None or only_file == filename:
+                if os.path.isfile(filename):
+                    if "lua" in filename:
+                        if file_is_newer_than(filename, "lastupload/" + filename) or force_all_files:
+                            print "Putting file " + filename
+                            with open(filename, 'r') as content_file:
+                                content = content_file.read()
+                                put_file(serial_port, "c:/libs/" + directory + "/" + filename, content)
+                                # delete_file(module, file)
+                            touch("lastupload/" + filename)
+                            compile_files.append(filename)
+                        else:
+                            print("File %s is not newer than last uploaded version" % (
+                                filename
+                            ))
     
         # for file in files:  # os.listdir("."):
         #     compiled = file.replace(".lua", ".out")
@@ -140,8 +142,12 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
         #     print("Not running main script as module was reset")
         # else:
         #     run_script(serial_port, "loader.out")
-    
-        run_script(serial_port, "loader.out")
+
+        try:
+            run_script(serial_port, "loader.out")
+        except ValueError as e:
+            print("Error starting script. Resetting module.")
+            reset(serial_port)
         read_all(serial_port)
     
     finally:
@@ -181,6 +187,12 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
+        '-t',
+        '--transfer-file',
+        help="Force transfer of this file only.",
+        default=None,
+    )
+    parser.add_argument(
         '-z',
         '--zip-files',
         help="Create zip file and don't upload scripts to device.",
@@ -193,4 +205,4 @@ if __name__ == '__main__':
     if args.zip_files:
         zip_files()
     else:
-        transfer_and_build_files(args.directory, not args.no_initial_reset, args.force_all_files, args.loader)
+        transfer_and_build_files(args.directory, not args.no_initial_reset, args.force_all_files, args.loader, args.transfer_file)

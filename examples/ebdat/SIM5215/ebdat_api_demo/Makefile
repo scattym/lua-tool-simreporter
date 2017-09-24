@@ -23,35 +23,35 @@ LD = armlink
 
 OUT=
 OBJ_CMD    = -o
-CPU = -cpu ARM926EJ-S
+#CPU = -cpu ARM926EJ-S
 STACKCHK = noswst
 INTRWORK = interwork
 END = -littleend
 CODE = $(END)
-CHK = -fa
-MSG = -Wb
-OPT = -Ospace -O2
+#CHK = -fa
+#MSG = -Wb
+# OPT = -Ospace -O2
 FNN=
 EBDCLNT_OP = -DFEATURE_EBDAT_CLIENT
 
-APCS = -apcs /$(STACKCHK)/$(INTRWORK)
+#APCS = -apcs /$(STACKCHK)/$(INTRWORK)
 
-CFLAGS0 = $(OUT) $(CPU) $(APCS) $(CODE) $(CHK) $(DBG) $(MSG) $(EBDCLNT_OP)
+CFLAGS0 = $(OUT) $(CPU) $(APCS) $(CODE) $(CHK) $(DBG) $(MSG) $(EBDCLNT_OP) -mfloat-abi=soft
 CFLAGS  = $(CFLAGS0) $(OPT) $(FNN)
 
-MAP     = -map
-INFO    = -info sizes,totals
-LIST    = -list $(EBDAT_IMG).map
-SYM     = -symbols -symdefs $(EBDAT_IMG).sym
-SCATTER = -scatter $(SCLFILE)
+#MAP     = -map
+#INFO    = -info sizes,totals
+# LIST    = -list $(EBDAT_IMG).map
+#SYM     = -symbols -symdefs $(EBDAT_IMG).sym
+#SCATTER = -scatter $(SCLFILE)
 ENTRY = -entry ebdat_customer_entry
 
-LFLAGS   := $(MAP) $(INFO) $(LIST) $(SYM) $(SCATTER) $(ENTRY) -remove -nodebug
+LFLAGS   := $(MAP) $(INFO) $(LIST) $(SYM) $(SCATTER) $(ENTRY) 
 
-CLIB    = "$(ARMHOME)"/lib/armlib/c_t__un.l# # ARM embedded ANSI C library
-FLIB    = "$(ARMHOME)"/lib/armlib/g_t_p.l#   # ARM embedded software floating 
+#CLIB    = "$(ARMHOME)"/lib/armlib/c_t__un.l# # ARM embedded ANSI C library
+#FLIB    = "$(ARMHOME)"/lib/armlib/g_t_p.l#   # ARM embedded software floating 
                                                  # point library
-MLIB    = "$(ARMHOME)"/lib/armlib/m_t_pu.l#  # ARM embedded software math 
+#MLIB    = "$(ARMHOME)"/lib/armlib/m_t_pu.l#  # ARM embedded software math 
 
 ARMLIBS = $(CLIB) $(FLIB) $(MLIB)
 

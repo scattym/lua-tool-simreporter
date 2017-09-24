@@ -40,7 +40,7 @@ is_version_quarantined = function(version)
     while true do
         local line = file:read("*l")
         if line == nil then
-            print("Reached end of file\r\n")
+            print("Reached end of quarantined file\r\n")
             return false
         end
         print("line is ", line, "<\r\n")

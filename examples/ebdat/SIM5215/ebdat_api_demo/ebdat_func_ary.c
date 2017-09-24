@@ -1,4 +1,4 @@
-#include ".\inc\cust_header.h"
+#include "inc/cust_header.h"
 
 //declare function pointer variables
 #define DEFINE_FUNC(name) \
