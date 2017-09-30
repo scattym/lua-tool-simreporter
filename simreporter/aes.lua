@@ -970,10 +970,6 @@ end
 
 -- Cipher block chaining mode encrypt function
 function public.encryptCBC(keySched, byteData, iv)
-    for i = 1, #byteData do
-        print(byteData[i])
-    end
-    print("\r\n")
 	util.xorIV(byteData, iv)
 	aes.encrypt(keySched, byteData, 1, byteData, 1)
 	return byteData
@@ -1108,9 +1104,7 @@ local function pwToKey(password, keyLength, iv)
 	local hash = sha256.init()
 	hash:update(password)
     local checksum = hash:final()
-    --local checksum_hex = tohex(checksum)
-	print(tohex(checksum), "\r\n")
-	--print(tohex(string.byte(checksum,1,keyLength)), "\r\n")
+	-- print(tohex(checksum), "\r\n")
 	return {string.byte(checksum,1,keyLength)}
 --[[
 	local padLength = keyLength
@@ -1152,48 +1146,7 @@ local function encrypt(password, data, keyLength, mode, iv)
 	local keyLength = keyLength or _M.AES128
 
 	local key = pwToKey(password, keyLength, iv)
--- 1101021113432583 2341247797110117 1029799
-    --print("Data is ", tostring(data), "\r\n")
-    print("\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-    print("z\r\n")
-
-
-
-
-
-    print("Hexified is \r\n")
-    --print(tohex(data))
-    --print("\r\n")
-    print("\r\n")
 	local paddedData = util.padByteString(data)
-    --print("Padded data is ", tostring(paddedData), "\r\n")
-    --print("Hexified is ")
-    --print(tohex(paddedData))
-    print("\r\n")
 
 	if mode == _M.ECBMODE then
 		return ciphermode.encryptString(key, paddedData, ciphermode.encryptECB, iv)

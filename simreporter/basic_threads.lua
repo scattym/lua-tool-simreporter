@@ -10,14 +10,24 @@ local unzip = require("unzip")
 local config = require("config")
 local firmware = require("firmware")
 local logging = require("logging")
+local keygen = require("keygen")
+local big_int = require("BigInt")
 
 local logger = logging.create("basic_threads", 30)
 
 local ati_string = at.get_device_info();
 local last_cell_report = 0;
 local imei = at_abs.get_imei()
+local key = ""
+local enc_key = ""
 
 local running_version;
+
+local function tohex(data)
+    return (data:gsub(".", function (x)
+        return ("%02x"):format(x:byte()) end)
+    )
+end
 
 function update_last_cell_report()
     thread.enter_cs(2);
@@ -110,14 +120,27 @@ end;
 function cell_tick()
     logger(10, "Starting cell data tick function");
     local client_id = 2;
+    logger(30, "Enc start, clock is: ", tostring(os.clock()))
+    key, enc_key = keygen.create_and_encrypt_key(128)
+    logger(30, "Key is: ", key);
+    logger(30, "Encrypted key is: ", enc_key);
+    logger(30, "Key is: ", big_int.num_to_hex(key));
+    logger(30, "Encrypted key is: ", big_int.num_to_hex(enc_key))
+    logger(30, "Clock is: ", tostring(os.clock()))
+    key_data = {}
+    key_data["key"] = key
+    key_data["enc_key"] = enc_key
     while (true) do
         logger(10, "Cell data thread waking up");
         if last_cell_report_has_expired() then
+            key_data["iv"] = big_int.bytes_to_num(keygen.create_key(128))
             tcp.open_network(client_id);
             for i=1,1 do
-                local cell_table = device.get_device_info_table();
+                local cell_table = device.get_device_info_table()
+                cell_table["key"] = big_int.num_to_hex(key)
+                cell_table["enc_key"] = big_int.num_to_hex(enc_key)
                 local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, config.get_config_value("NMEA_LOOP_COUNT"));
-                local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, true)
+                local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, key_data)
                 logger(10, "Result is ", tostring(result), " and response is ", response);
                 if result and headers["response_code"] == "200" then
                     update_last_cell_report();
@@ -163,14 +186,12 @@ function get_config()
     end
 end
 
-local function tohex(data)
-    return (data:gsub(".", function (x)
-        return ("%02x"):format(x:byte()) end)
-    )
-end
+
 
 local start_threads = function (version)
     running_version = version;
+    logger(30, "Starting key generation")
+    logger(30, "Finished key generation")
     logger(10, "Start of start_threads")
     -- logging.set_log_file("c:/log.txt")
     --logger(10, "Trying to load config first time\r\n")
@@ -187,7 +208,7 @@ local start_threads = function (version)
     logger(10, "cell_tick_thread: ", tostring(cell_tick_thread));
     logger(10, "Firmware check thread: ", tostring(firmware_check_thread));
     logger(10, "Config update thread: ", tostring(config_update_thread));
-    thread.sleep(1000);
+    -- thread.sleep(1000);
     logger(10, "Starting threads");
     result = thread.run(gps_tick_thread);
     logger(10, "GPS start thread result is ", tostring(result));

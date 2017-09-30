@@ -24,8 +24,24 @@ local add_field = function(data, key, value, type)
     return return_str;
 end;
 
+local function encode_strings(table)
+    for key, value in pairs(table) do
+        if type(value) == "table" then
+            encode_strings(value)
+        elseif type(value) == "string" then
+            table[key] = value:gsub("\r\n", "|"):gsub("\n", "|")
+        end
+    end
+end
+
 local encapsulate_data = function(device_info, table_data, iteration, count)
-    local data = ""
+    table_data["version"] = "1"
+    table_data["device_info"] = device_info
+    table_data["packet_number"] = iteration
+    table_data["packet_count"] = count
+    encode_strings(table_data)
+    return json.encode(table_data)
+    --[[local data = ""
     data = add_field(data, "version", "1", "raw")
     data = add_field(data, "device_info", device_info, "string")
     for key, value in pairs(table_data) do
@@ -33,7 +49,7 @@ local encapsulate_data = function(device_info, table_data, iteration, count)
     end;
     data = add_field(data, "packet_number", iteration, "raw")
     data = add_field(data, "packet_count", count, "raw")
-    return "{" .. data .. "}";
+    return "{" .. data .. "}";]]--
 end;
 
 _M.encapsulate_data = encapsulate_data

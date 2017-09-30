@@ -3,6 +3,7 @@
 --local socket = require("simsocket")
 local logger = require("logging")
 local aeslib = require("aes")
+local big_int = require("BigInt")
 
 local _M = {}
 
@@ -366,9 +367,15 @@ local http_open_send_close = function(client_id, host, port, url, data, headers,
     if not headers then
         headers = {}
     end
-    if encrypt then
+    if type(encrypt) == "bool" and encrypt == true then
         headers["encrypted"] = "true"
     end
+    if type(encrypt) == "table" and encrypt["key"] ~= nil and encrypt["enc_key"] ~= nil then
+        headers["encrypted"] = "true"
+        headers["iv"] = big_int.num_to_hex(encrypt["iv"])
+        headers["ke"] = big_int.num_to_hex(encrypt["enc_key"])
+    end
+
     local payload = ""
     if encrypt and data ~= nil and data ~= "" then
         logger.log("tcp_client", 0, "About to encrypt payload");

@@ -27,7 +27,7 @@ def put_file(serial_port, filename, file_contents):
     for i in range(0, len(file_contents), 8192):
         serial_port.write(file_contents[i:i+8192])
         time.sleep(0.5)
-    response = get_response(serial_port, 1.5)
+    response = get_response(serial_port, 1)
     if "OK" not in response:
         raise ValueError(response)
 

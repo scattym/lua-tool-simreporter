@@ -7,7 +7,7 @@ import os.path
 import argparse
 
 # module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9991", 115200, timeout=5)
+serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9992", 115200, timeout=5)
 # module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
 VERSION = "201709141"
@@ -17,11 +17,13 @@ files = [
     "at_abs.lua",
     "at_commands.lua",
     "basic_threads.lua",
+    "BigInt.lua",
     "canary.lua",
     "config.lua",
     "device.lua",
     "encapsulation.lua",
     "firmware.lua",
+    "keygen.lua",
     "json.lua",
     "logging.lua",
     "network_setup.lua",

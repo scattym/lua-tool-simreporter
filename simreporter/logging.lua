@@ -5,7 +5,9 @@ LOG_LEVEL["root"] = 30
 local LOG_FILENAME = ""
 local LOG_FILE_FD = false
 local MAX_FILE_SIZE = 1048576
-printdir(1)
+if printdir then
+    printdir(1)
+end
 
 local create_logger = function(library, level)
     LOG_LEVEL[library] = level
@@ -40,20 +42,26 @@ local log = function(library, level, ...)
         LOG_LEVEL[library] = 30
     end
     if ( LOG_LEVEL[library] == nil and LOG_LEVEL["root"] <= level ) or LOG_LEVEL[library] <= level then
-        thread.enter_cs(3);
-        print(tostring(thread.index()), ":", library, ":", file_line.linedefined, ":", level, ":")
+        local thread_index = ""
+        if thread then
+            thread.enter_cs(3);
+            thread_index = tostring(thread.index())
+        end
+        print(thread_index, ":", library, ":", file_line.linedefined, ":", level, ":")
         for i, value in ipairs(arg) do
             print(tostring(value))
         end
         print("\r\n")
         if LOG_FILE_FD ~= false then
-            result = LOG_FILE_FD:write(tostring(thread.index()), ":", library, ":", file_line.linedefined, ":", level, ":")
+            result = LOG_FILE_FD:write(thread_index, ":", library, ":", file_line.linedefined, ":", level, ":")
             for i, value in ipairs(arg) do
                 LOG_FILE_FD:write(tostring(value))
             end
             LOG_FILE_FD:write("\n")
         end
-        thread.leave_cs(3)
+        if thread then
+            thread.leave_cs(3)
+        end
         collectgarbage()
     end
 

@@ -144,7 +144,7 @@ else
     running_version = "base"
 end
 print("Package path is: ", package.path, "\r\n")
-print("Max version is: ", max_version, "\r\n")
+print("Running version is: ", running_version, "\r\n")
 
 local network_setup
 local basic_threads
@@ -171,7 +171,7 @@ end
 collectgarbage()
 
 network_setup.set_network_from_sms_operator();
-vmsleep(15000);
+vmsleep(10000);
 
 thread_list = thread.list()
 print("Thread list is ", tostring(thread_list), "\r\n")
@@ -181,8 +181,8 @@ print("main_id=", main_id, "\r\n");
 
 collectgarbage();
 print("Starting threads\r\n")
-basic_threads.start_threads(running_version);
+local status, result = pcall(basic_threads.start_threads(running_version))
 
-print("exit main thread\r\n");
+print("exit main thread. status: " .. tostring(status) .. " result: " .. tostring(result) .. "\r\n");
 
 print(result);
