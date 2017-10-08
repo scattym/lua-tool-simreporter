@@ -23,15 +23,15 @@ end
 logger.create_logger("firmware", 0)
 function get_firmware(imei, version)
     local fn_result = false
-    local open_net_result = tcp.open_network(client_id);
-    logger.log("firmware", 10, "Open network response is: ", open_net_result);
+    --local open_net_result = tcp.open_network(client_id);
+    --logger.log("firmware", 10, "Open network response is: ", open_net_result);
     local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/get_firmware?ident=imei:" .. imei, "");
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 10, "Callout for firmware failed. Result was: ", result, " and response code: ", headers["response_code"])
     else
         logger.log("firmware", 10, "Response length is ", #response)
         local firmware_json = json.decode(response);
-        tcp.close_network(client_id);
+        -- tcp.close_network(client_id);
         logger.log("firmware", 10, firmware_json);
         if not firmware_json then
             logger.log("firmware", 10, "Unable to load firmware json")
@@ -72,10 +72,10 @@ function get_firmware(imei, version)
 end
 
 local check_firmware_and_maybe_update = function(imei, current_version)
-    local open_net_result = tcp.open_network(client_id);
+    --local open_net_result = tcp.open_network(client_id);
     logger.log("firmware", 10, "Open network response is: ", open_net_result, "\r\n");
     local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/get_firmware_version?ident=imei:" .. imei, "");
-    tcp.close_network(client_id);
+    --tcp.close_network(client_id);
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 10, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
     else

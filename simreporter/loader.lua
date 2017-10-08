@@ -12,7 +12,7 @@ function prequire(...)
     return nil
 end
 DEBUG_LEVEL = 10
-vmsleep(30000);
+vmsleep(7000);
 printdir(1);
 
 quarantine_version = function(version)
@@ -146,13 +146,11 @@ end
 print("Package path is: ", package.path, "\r\n")
 print("Running version is: ", running_version, "\r\n")
 
-local network_setup
 local basic_threads
 
-network_setup = prequire("network_setup")
 basic_threads = prequire("basic_threads")
 printdir(1);
-if( network_setup == nil or basic_threads == nil ) then
+if( basic_threads == nil ) then
     print("Unable to load modules from version ", running_version, "\r\n")
     if running_version == "base" then
         print("Not quarantining base\r\n")
@@ -170,12 +168,6 @@ end
 
 collectgarbage()
 
-network_setup.set_network_from_sms_operator();
-vmsleep(10000);
-
-thread_list = thread.list()
-print("Thread list is ", tostring(thread_list), "\r\n")
-
 main_id = thread.identity();
 print("main_id=", main_id, "\r\n");
 
@@ -183,6 +175,6 @@ collectgarbage();
 print("Starting threads\r\n")
 local status, result = pcall(basic_threads.start_threads(running_version))
 
-print("exit main thread. status: " .. tostring(status) .. " result: " .. tostring(result) .. "\r\n");
+print("exit main thread\r\n");
 
 print(result);

@@ -1,6 +1,10 @@
 local _M = {}
 
-local bit = require("bit")
+local util = require("util")
+local logging = require("logging")
+local logger = logging.create("aes", 30)
+
+--local bit = require("bit")
 local function _W(f) local e=setmetatable({}, {__index = _ENV or getfenv()}) if setfenv then setfenv(f, e) end return f(e) or e end
 local bit=_W(function(_ENV, ...)
 --[[
@@ -954,7 +958,7 @@ function public.encryptString(key, data, modeFunction, iv)
 
 		buffer.addString(encryptedData, string.char(unpack(byteData)))
 	end
-
+    collectgarbage();
 	return buffer.toString(encryptedData)
 end
 
@@ -1094,17 +1098,11 @@ _M.OFBMODE = 3
 _M.CFBMODE = 4
 _M.CTRMODE = 5
 
-local function tohex(data)
-    return (data:gsub(".", function (x)
-        return ("%02x"):format(x:byte()) end)
-    )
-end
-
 local function pwToKey(password, keyLength, iv)
 	local hash = sha256.init()
 	hash:update(password)
     local checksum = hash:final()
-	-- print(tohex(checksum), "\r\n")
+    --logger(0, "Checksum is: ", util.tohex(checksum))
 	return {string.byte(checksum,1,keyLength)}
 --[[
 	local padLength = keyLength
@@ -1141,7 +1139,8 @@ end
 local function encrypt(password, data, keyLength, mode, iv)
 	assert(password ~= nil, "Empty password.")
 	assert(data ~= nil, "Empty data.")
-
+    -- logger(0, "Password: ", password)
+    -- logger(0, "data: ", data)
 	local mode = mode or _M.CBCMODE
 	local keyLength = keyLength or _M.AES128
 
@@ -1180,7 +1179,7 @@ local function decrypt(password, data, keyLength, mode, iv)
 	local keyLength = keyLength or AES128
 
 	local key = pwToKey(password, keyLength, iv)
-
+    --logger(0, "Key: ", util.tohex(key))
 	local plain
 	if mode == ECBMODE then
 		plain = ciphermode.decryptString(key, data, ciphermode.decryptECB, iv)

@@ -3,12 +3,15 @@
 --local socket = require("simsocket")
 local logger = require("logging")
 local aeslib = require("aes")
-local big_int = require("BigInt")
+local rsa = require("rsa_lib")
+local util = require("util")
 
 local _M = {}
 
 local CLIENT_TO_APP_HANDLE = {}
 logger.create_logger("tcp_client", 30)
+
+local CLOSE_NETWORK_AFTER_TRANSFER = true
 
 function check_and_enable_network(app_handle)
     logger.log("tcp_client", 0, "check_network_dorm_function, app_handle: " , app_handle);
@@ -35,6 +38,7 @@ function check_and_enable_network(app_handle)
         status = network.status(app_handle)
         logger.log("tcp_client", 0, "network status = ", status);
         if( safety_counter > 10 ) then
+            logger.log("tcp_client", 30, "Unable to bring network up after 10 attempts for app handle ", app_handle);
             return false;
         end;
         safety_counter = safety_counter + 1;
@@ -43,10 +47,17 @@ function check_and_enable_network(app_handle)
     return true;
 end;
 
-function set_network_dormant(app_handle)
-    logger.log("tcp_client", 0, "Setting network dormant")
-    network.dorm(app_handle, false);
+function set_network_dormant(app_handle, dormant_flag)
+    logger.log("tcp_client", 0, "Setting network dormant to: ", dormant_flag, " for app_handle: ", app_handle)
+    network.dorm(app_handle, dormant_flag)
+    thread.sleep(1000);
 end;
+
+function get_network_status(app_handle)
+    local status = network.status(app_handle)
+    logger.log("tcp_client", 0, "Network status for app_handle: ", app_handle, " is ", status)
+    return status
+end
 
 function config_network_common_parameters()
     logger.log("tcp_client", 0, "config_network_common_parameters");
@@ -94,30 +105,47 @@ local open_network = function(client_id)
     -- local cid = 1;--0=>use setting of AT+CSOCKSETPN. 1-16=>use self defined cid
     local timeout = 30000;--  '<= 0' means wait for ever; '> 0' is the timeout milliseconds
     local app_handle = network.open(client_id, timeout);--!!! If the PDP for cid is already opened by other app, this will return a reference to the same PDP context.
+    -- set_network_dormant(app_handle, false);
     if (not app_handle) then
         logger.log("tcp_client", 30, "failed to open network for client id " .. tostring(client_id));
-        return;
-    end;
-    logger.log("tcp_client", 0, "network.open(), app_handle=", app_handle);
+    else
+        logger.log("tcp_client", 0, "network.open(), app_handle=", app_handle);
         CLIENT_TO_APP_HANDLE[client_id] = app_handle;
+    end
     thread.leave_cs(5)
     return app_handle;
 end;
 _M.open_network = open_network;
 
+local function get_current_app_handle_maybe(client_id)
+    local app_handle
+    thread.enter_cs(5)
+    if CLIENT_TO_APP_HANDLE[client_id] then
+        logger.log("tcp_client", 0, "Using already created app_handle: ", CLIENT_TO_APP_HANDLE[client_id], " for client: ", client_id);
+        app_handle = CLIENT_TO_APP_HANDLE[client_id]
+    else
+        logger.log("tcp_client", 0, "No current app handle for client id: ", client_id);
+    end
+    thread.leave_cs(5)
+    return app_handle
+end
+
 local client_id_to_app_handle = function(client_id, create_if_not_exists)
     local app_handle
-    if CLIENT_TO_APP_HANDLE[client_id] then
-        thread.enter_cs(5)
-        logger.log("tcp_client", 0, "Using already created app_handle: ", CLIENT_TO_APP_HANDLE[client_id], " for client: ", client_id);
-        app_handle = CLIENT_TO_APP_HANDLE[client_id];
-        thread.leave_cs(5)
-    elseif create_if_not_exists then
-        local app_handle = open_network(client_id);
-        logger.log("tcp_client", 0, "Tried to create new app_handle: ", app_handle);
+
+    app_handle = get_current_app_handle_maybe(client_id)
+    logger.log("tcp_client", 0, "App hande returned from get_current_app_handle_maybe: ", app_handle)
+    if app_handle == nil then
+        if create_if_not_exists then
+            logger.log("tcp_client", 0, "Trying to create an app handle for client id: ", client_id)
+            app_handle = open_network(client_id);
+            logger.log("tcp_client", 0, "open network resulting app handle is: ", app_handle);
+        else
+            logger.log("tcp_client", 0, "Not trying to create as create_if_not_exists is: ", create_if_not_exists)
+        end
     else
-        logger.log("tcp_client", 0, "No app handle to return for client: ", client_id);
-    end;
+        logger.log("tcp_client", 0, "App handle for client id: ", client_id, " found and is: ", app_handle)
+    end
     return app_handle
 
 end;
@@ -173,15 +201,8 @@ local send_data = function(client_id, host, port, data)
 
     --[[
 
-
-
   If the client_id parameter is the same as the network.open(), the network.resolve() will use the same PDP activated using network.open(), 
-
-
-
   or else the network.resolve() will activate new PDP context by itself.
-
-
 
   ]]
     
@@ -202,7 +223,7 @@ local send_data = function(client_id, host, port, data)
     local socket_fd = socket.create(app_handle, SOCK_TCP);
 
     if (not socket_fd or socket_fd < 1) then
-        logger.log("tcp_client", 30, "failed to create socket. socket_fd is ", tostring(socket_fd));
+        logger.log("tcp_client", 30, "failed to create socket for app handle: ", app_handle, " socket_fd is ", tostring(socket_fd));
     elseif (ip_address) then
         --enable keep alive
         socket.keepalive(socket_fd, true);--this depends on network.set_tcp_ka_param() to set KEEP ALIVE interval and maximum check times.
@@ -212,19 +233,9 @@ local send_data = function(client_id, host, port, data)
         local connect_result, socket_released = socket.connect(socket_fd, ip_address, port, timeout);
         --[[
 
-    
-
      the socket_released indicates whether the socket handle has been released when failing to connect to the server.
-
-    
-
      If socket_released is true, the socket.close() function needs not be called further. or else
-
-    
-
      the socket.close() function still needs to be called to release the socket handle.
-
-    
 
      ]]
         logger.log("tcp_client", 0, "socket.connect = [result=", connect_result, ",socket_released=", socket_released, "]\r\n");
@@ -271,17 +282,28 @@ _M.send_data = send_data;
 
 local close_network = function(client_id)
     local app_handle = client_id_to_app_handle(client_id, false)
+    local result
+    local status
     if app_handle then
-        set_network_dormant(app_handle);
-        logger.log("tcp_client", 0, "closing network...");
-        local result = network.close(app_handle);
-        logger.log("tcp_client", 0, "network.close(), result=", result);
+        set_network_dormant(app_handle, true);
+        status = network.status(app_handle);
+        logger.log("tcp_client", 0, "network status before close is ", tostring(status));
+        if CLOSE_NETWORK_AFTER_TRANSFER then
+            logger.log("tcp_client", 0, "closing network for app_handle: ", app_handle);
+            result = network.close(app_handle);
+            logger.log("tcp_client", 0, "network.close(), result=", result);
+            thread.enter_cs(5)
+            CLIENT_TO_APP_HANDLE[client_id] = nil
+            thread.leave_cs(5)
+        else
+            logger.log("tcp_client", 0, "Not closing network as CLOSE_NETWORK_AFTER_TRANSFER set to: ", CLOSE_NETWORK_AFTER_TRANSFER)
+        end
+        status = network.status(app_handle);
+        logger.log("tcp_client", 0, "network status after close is ", tostring(status));
     else
         logger.log("tcp_client", 30, "No app handle for client id: ", client_id)
     end;
-    thread.enter_cs(5)
-    CLIENT_TO_APP_HANDLE[client_id] = nil
-    thread.leave_cs(5)
+    -- App handle seems to be getting lost. Don't drop it for now.
     return result;
 end;
 _M.close_network = close_network;
@@ -367,25 +389,25 @@ local http_open_send_close = function(client_id, host, port, url, data, headers,
     if not headers then
         headers = {}
     end
-    if type(encrypt) == "bool" and encrypt == true then
+    if type(encrypt) == "boolean" and encrypt == true then
         headers["encrypted"] = "true"
     end
     if type(encrypt) == "table" and encrypt["key"] ~= nil and encrypt["enc_key"] ~= nil then
+        headers["iv"] = rsa.num_to_hex(encrypt["iv"])
+        headers["sk"] = rsa.num_to_hex(encrypt["enc_key"])
         headers["encrypted"] = "true"
-        headers["iv"] = big_int.num_to_hex(encrypt["iv"])
-        headers["ke"] = big_int.num_to_hex(encrypt["enc_key"])
     end
 
     local payload = ""
-    if encrypt and data ~= nil and data ~= "" then
+    if encrypt ~= false and data ~= nil and data ~= "" then
         logger.log("tcp_client", 0, "About to encrypt payload");
         -- encrypt(password, data, keyLength, mode, iv)
         payload = aeslib.encrypt("password", data, aeslib.AES128, aeslib.CBCMODE)
         --payload = data
-        logger.log("tcp_client", 0, "Encrypted payload is " .. tostring(payload));
+        logger.log("tcp_client", 0, "Encrypted payload is ", util.tohex(payload));
     else
         payload = data
-        logger.log("tcp_client", 0, "Not encrypting " .. tostring(payload));
+        logger.log("tcp_client", 0, "Not encrypting ", tostring(payload));
     end
 
     if( not client_id ) then

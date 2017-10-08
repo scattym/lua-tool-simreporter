@@ -1,7 +1,7 @@
 
 local _M = {}
 
-local big_int = require("BigInt")
+local rsa = require("rsa_lib")
 local logging = require("logging")
 local logger = logging.create("keygen", 30)
 
@@ -37,16 +37,16 @@ _M.create_key = create_key
 local create_and_encrypt_key = function(bits)
     local key = create_key(128)
     logger(30, "Key generation complete.")
-    local message = big_int.bytes_to_num(key) -- message is the key
-    logger(30, "Key is " .. big_int.num_to_hex(message))
+    local message = rsa.bytes_to_num(key) -- message is the key
+    logger(30, "Key is " .. rsa.num_to_hex(message))
     logger(30, "Calculated message as big int: " .. tostring(message))
-    local exponent = big_int.hex_to_num("10001")
+    local exponent = rsa.hex_to_num("10001")
     logger(30, "Calculated exponent")
-    local n_modulus = big_int.hex_to_num(modulus)
+    local n_modulus = rsa.hex_to_num(modulus)
     logger(30, "Calculated modulus")
 
-    local enc_key = big_int.mod_power(message, exponent, n_modulus)
-    logger(30, "Encrypted key: ", big_int.num_to_hex(enc_key))
+    local enc_key = rsa.mod_power(message, exponent, n_modulus)
+    logger(30, "Encrypted key: ", rsa.num_to_hex(enc_key))
 
     return message, enc_key
 end

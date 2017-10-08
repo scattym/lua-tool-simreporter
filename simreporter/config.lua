@@ -204,8 +204,8 @@ _M.load_config_from_file = load_config_from_file
 
 local load_config_from_server = function(imei, version)
     local fn_result = false
-    local open_net_result = tcp.open_network(client_id);
-    logger.log("config", 0, "Open network response is: ", open_net_result);
+    --local open_net_result = tcp.open_network(client_id);
+    --logger.log("config", 0, "Open network response is: ", open_net_result);
     local result, headers, response = tcp.http_open_send_close(client_id, get_config_value("UPDATE_HOST"), get_config_value("UPDATE_PORT"), "/get_config?ident=imei:" .. imei .. "&version=" .. version .. "&type=5300");
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("config", 30, "Callout for config failed. Result was: ", result, " and response code: ", headers["response_code"])

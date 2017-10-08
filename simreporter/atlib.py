@@ -12,6 +12,60 @@ def get_response(serial_port, sleep_time=0.25):
     return response
 
 
+def parse_file_length_message(msg):
+    print "Parsing %s" % msg
+    msg = msg.replace('\r', '').replace('\n', '')
+    message_arr = msg.split(',')
+    return int(message_arr[1])
+
+
+def parse_file_payload(payload):
+    return_data = ""
+    start = 0
+    line_end = 0
+    i = 0
+    while i < len(payload):
+        if payload[i] == '\n':
+            line_end = i
+            if "DATA" in payload[start:i]:
+                size = parse_file_length_message(payload[start:i])
+                if size != 0:
+                    print ("size is %s" %size)
+                    return_data += payload[line_end+1:line_end+1+size]
+                    start = line_end+1+size
+                    i = start
+            else:
+                i = i + 1
+                start = i
+        else:
+            i = i + 1
+    return return_data
+
+
+def get_file(serial_port, src_file):
+    serial_port.write('AT+CATR=0\r\n')
+    response = get_response(serial_port)
+    print "response is %s" % response
+
+    serial_port.write('AT+CFTRANTX="%s"\r\n' % src_file)
+    finished = False
+    overall = ""
+    while not finished:
+        data = get_response(serial_port)
+        print "Data is ", data
+        overall = overall + data
+        if "+CFTRANTX: 0" in data:
+            finished = True
+
+    data = parse_file_payload(overall)
+    print "Data is >%s<" % data
+    return data
+
+
+def get_file_xmodem(serial_port, src_file):
+    serial_port.write('AT+CTXFILE="%s"\r\n' % src_file)
+
+
 def put_file(serial_port, filename, file_contents):
     # serial_port.write("ATE0\r\n")
     # get_response(serial_port)

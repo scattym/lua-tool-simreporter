@@ -88,5 +88,12 @@ local print_simple_table = function(name, input)
 end
 _M.print_simple_table = print_simple_table
 
+local tohex = function(data)
+    return (data:gsub(".", function (x)
+        return ("%02x"):format(x:byte()) end)
+    )
+end
+_M.tohex = tohex
+
 
 return _M

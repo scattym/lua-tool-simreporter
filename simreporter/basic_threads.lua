@@ -11,7 +11,8 @@ local config = require("config")
 local firmware = require("firmware")
 local logging = require("logging")
 local keygen = require("keygen")
-local big_int = require("BigInt")
+local rsa = require("rsa_lib")
+local network_setup = require("network_setup")
 
 local logger = logging.create("basic_threads", 30)
 
@@ -29,13 +30,13 @@ local function tohex(data)
     )
 end
 
-function update_last_cell_report()
+local function update_last_cell_report()
     thread.enter_cs(2);
     last_cell_report = os.clock();
     thread.leave_cs(2);
 end;
 
-function last_cell_report_has_expired()
+local function last_cell_report_has_expired()
     thread.enter_cs(2);
     local copy_of_last_cell_report = last_cell_report;
     thread.leave_cs(2);
@@ -54,7 +55,7 @@ function last_cell_report_has_expired()
 end;
 
 
-function wait_until_lock(iterations)
+local function wait_until_lock(iterations)
     for i=1,iterations do
         local is_locked = at_abs.is_location_valid();
         if is_locked then
@@ -68,7 +69,7 @@ function wait_until_lock(iterations)
     return false
 end
 
-function gps_tick()
+local function gps_tick()
     logger(10, "Starting gps tick function");
     local client_id = 1;
     while (true) do
@@ -78,8 +79,8 @@ function gps_tick()
         local gps_locked = wait_until_lock(config.get_config_value("GPS_LOCK_CHECK_MAX_LOOP"));
         --thread.sleep(GPS_LOCK_TIME);
         logger(10, "Requesting nmea data");
-        local open_net_result = tcp.open_network(client_id);
-        logger(10, "Open network response is: ", open_net_result);
+        --local open_net_result = tcp.open_network(client_id);
+        --logger(10, "Open network response is: ", open_net_result);
         local max_loop_count = config.get_config_value("NMEA_LOOP_COUNT")
         local current_loop = 0
         while max_loop_count == 0 or current_loop <= max_loop_count do
@@ -107,7 +108,7 @@ function gps_tick()
             thread.sleep(config.get_config_value("NMEA_SLEEP_TIME"));
             max_loop_count = config.get_config_value("NMEA_LOOP_COUNT") -- Ensure we exit if config changes
         end;
-        tcp.close_network(client_id);
+        -- tcp.close_network(client_id);
         logger(10, "Turning gps off");
         gps.gpsclose();
         logger(10, "Sleeping");
@@ -117,28 +118,32 @@ function gps_tick()
     end;
 end;
 
-function cell_tick()
+local function cell_tick()
     logger(10, "Starting cell data tick function");
     local client_id = 2;
     logger(30, "Enc start, clock is: ", tostring(os.clock()))
-    key, enc_key = keygen.create_and_encrypt_key(128)
+
+
+
+    --[[key, enc_key = keygen.create_and_encrypt_key(128)
     logger(30, "Key is: ", key);
     logger(30, "Encrypted key is: ", enc_key);
-    logger(30, "Key is: ", big_int.num_to_hex(key));
-    logger(30, "Encrypted key is: ", big_int.num_to_hex(enc_key))
+    logger(30, "Key is: ", rsa.num_to_hex(key));
+    logger(30, "Encrypted key is: ", rsa.num_to_hex(enc_key))
     logger(30, "Clock is: ", tostring(os.clock()))
-    key_data = {}
+    local key_data = {}
     key_data["key"] = key
-    key_data["enc_key"] = enc_key
+    key_data["enc_key"] = enc_key]]--
+    local key_data = true
+
     while (true) do
         logger(10, "Cell data thread waking up");
         if last_cell_report_has_expired() then
-            key_data["iv"] = big_int.bytes_to_num(keygen.create_key(128))
-            tcp.open_network(client_id);
+            --key_data["iv"] = rsa.bytes_to_num(keygen.create_key(128))
+            --tcp.open_network(client_id);
             for i=1,1 do
                 local cell_table = device.get_device_info_table()
-                cell_table["key"] = big_int.num_to_hex(key)
-                cell_table["enc_key"] = big_int.num_to_hex(enc_key)
+                --cell_table["key"] = rsa.num_to_hex(key)
                 local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, config.get_config_value("NMEA_LOOP_COUNT"));
                 local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, key_data)
                 logger(10, "Result is ", tostring(result), " and response is ", response);
@@ -150,7 +155,7 @@ function cell_tick()
                 collectgarbage();
                 thread.sleep(config.get_config_value("NMEA_SLEEP_TIME"));
             end;
-            tcp.close_network(client_id);
+            --tcp.close_network(client_id);
         else
             logger(10, "Cell data has already been reported at ", tostring(last_cell_report));
         end
@@ -161,7 +166,7 @@ function cell_tick()
 end;
 
 
-function get_firmware_version()
+local function get_firmware_version()
     logger(10, "Trying to retrieve firmware version");
     logger(10, "imei: ", imei)
     local client_id = 3;
@@ -172,7 +177,7 @@ function get_firmware_version()
     end
 end
 
-function get_config()
+local function get_config()
     logger(10, "Trying to retrieve config");
     logger(10, "imei: ", imei)
     logger(10, "imei: ", running_version)
@@ -180,19 +185,137 @@ function get_config()
         local config_result = config.load_config_from_server(imei, running_version)
         logger(10, "Config load result was: ", config_result)
         logger(10, "mem used: ", getcurmem())
-        config.dump_config()
+        --config.dump_config()
         collectgarbage()
         thread.sleep(config.get_config_value("CONFIG_SLEEP_TIME"));
     end
 end
 
+local function process_out_cmd()
+    local OUT_CMD_EVENT = 31
+    local count = 0
 
+    thread.setevtowner(31,31)
+
+    while ( true ) do
+        logger(30, "Waiting for an event")
+        evt, evt_param1, evt_param2, evt_param3, evt_clock = waitevt(99999999);
+        logger(30, "Out fo wait evt. evt: ", evt, " p1: ", evt_param1, " p2: ", evt_param2, " p3: ", evt_param3, " clock: ", evt_clock)
+        if (evt >= 0) then
+            count = count + 1
+            logger(30, "(count=", count, ")", os.clock(), " event = ", evt)
+            if ( evt == OUT_CMD_EVENT ) then
+                logger(30, "Got out command event. p1: ", evt_param1, " p2:", evt_param2, " p3:", evt_param3, " clock:", evt_clock)
+            end
+        end
+    end
+end
 
 local start_threads = function (version)
     running_version = version;
-    logger(30, "Starting key generation")
-    logger(30, "Finished key generation")
+
+    network_setup.set_network_from_sms_operator();
+    vmsleep(2000);
+    --[[for j=36,255 do
+        for i=0,100 do
+            logger(30, "setting for device: ", j, " and register: ", i)
+            i2c.write_i2c_dev(j, i, 101, 1)
+            thread.sleep(100)
+        end
+    end]]--
+
     logger(10, "Start of start_threads")
+    --[[spi.set_clk(0, 1, 1);
+    logger(30, "set_cs")
+    spi.set_cs(1, 1);
+    logger(30, "set_freq")
+    spi.set_freq(1000, 500000, 1000);
+    logger(30, "set_num_bits")
+    spi.set_num_bits(8, 0, 0);
+    logger(30, "config_device")
+    spi.config_device();
+    spi.write(141, 42, 1)
+    while true do
+        for i=1,100 do
+            spi.write(65, i, 1)
+            a, b, c, d = spi.read(i, 1)
+            logger(30, "a:", tostring(a), ",b:", tostring(b), ",c:", tostring(c), ",d:", tostring(d))
+            thread.sleep(100)
+        end
+        spi.write(10, 101, 1)
+
+        thread.sleep(1000)
+    end]]--
+
+    --[[while true do
+        for clock_mode=0,1 do
+        --for clock_mode=1,1 do
+            for clk_pol=0,1 do
+            --for clk_pol=1,1 do
+                for tranfer_mode=0,1 do
+                --for tranfer_mode=1,1 do
+                    for cs_mode=0,1 do
+                        for cs_pol=0,1 do
+                            logger(30, "clock_mode: ", clock_mode, " clk_pol: ", clk_pol, " tranfer_mode: ", tranfer_mode, " cs_mode: ", cs_mode, " cs_pol: ", cs_pol)
+                            logger(30, "set_freq")
+                            spi.set_freq(10000, 10000, 1000);
+                            logger(30, "set_num_bits")
+                            spi.set_num_bits(8, 0, 0);
+                            logger(30, "config_device")
+                            spi.set_clk(clock_mode, clk_pol, tranfer_mode);
+                            thread.sleep(100)
+                            spi.set_cs(cs_mode, cs_pol);
+                            thread.sleep(100)
+                            spi.config_device();
+                            thread.sleep(100)
+                            for i=1,10 do
+                                --    self.dev_write(0x2A, 0x8D)
+                                --    self.dev_write(0x2B, 0x3E)
+                                --    self.dev_write(0x2D, 30)
+                                --    self.dev_write(0x2C, 0)
+                                --    self.dev_write(0x15, 0x40)
+                                --    self.dev_write(0x11, 0x3D)
+                                --    self.dev_write(0x26, (self.antenna_gain<<4))
+
+                                spi.write(141, 42, 1)
+                                thread.sleep(100)
+                                spi.write(62, 43, 1)
+                                thread.sleep(100)
+                                spi.write(30, 45, 1) -- spi.write(30, 0x2D, 1)
+                                thread.sleep(100)
+                                spi.write(0, 44, 1) -- spi.write(0, 0x2C, 1)
+                                thread.sleep(100)
+                                spi.write(64, 21, 1) -- spi.write(0x40, 0x15, 1)
+                                thread.sleep(100)
+                                spi.write(61, 17, 1) -- spi.write(0x3D, 0x11, 1)
+                                thread.sleep(100)
+                                logger(30, "Attempting to read from device.")
+                                for j=1,3 do
+                                    spi.write(65, 0, 1)
+                                    spi.write(65, 0, 1)
+                                    spi.write(65, 0, 1)
+                                    spi.write(65, 0, 1)
+                                    thread.sleep(100)
+                                    spi.write(10, 0, 1)
+                                    thread.sleep(100)
+                                    logger(30, "Attempting spi read.")
+                                    a, b, c, d = spi.read(0, 1) -- local a, b, c, d = spi.read(0x04, 4)
+                                    thread.sleep(100)
+                                    logger(30, "Attempting to print values.")
+                                    logger(30, "a:", tostring(a), ",b:", tostring(b), ",c:", tostring(c), ",d:", tostring(d))
+                                end
+                            end
+                            logger(30, "Sleeping for 1 second")
+                            thread.sleep(1000)
+                        end
+                    end
+                end
+            end
+        end
+    end]]--
+
+
+
     -- logging.set_log_file("c:/log.txt")
     --logger(10, "Trying to load config first time\r\n")
     --local config_load_result = config.load_config_from_file()
@@ -200,14 +323,17 @@ local start_threads = function (version)
     --logger(10, "Trying to save config to file")
     --local config_save_result = config.save_config_to_file()
     --logger(10, "Save config result is ", config_save_result)
-    local gps_tick_thread = thread.create(gps_tick);
-    local cell_tick_thread = thread.create(cell_tick);
-    local firmware_check_thread = thread.create(get_firmware_version);
-    local config_update_thread = thread.create(get_config);
+    local gps_tick_thread = thread.create(gps_tick)
+    local cell_tick_thread = thread.create(cell_tick)
+    local firmware_check_thread = thread.create(get_firmware_version)
+    local config_update_thread = thread.create(get_config)
+    local out_cmd_thread = thread.create(process_out_cmd)
     logger(10, "GPS tick thread: ", tostring(gps_tick_thread));
     logger(10, "cell_tick_thread: ", tostring(cell_tick_thread));
     logger(10, "Firmware check thread: ", tostring(firmware_check_thread));
     logger(10, "Config update thread: ", tostring(config_update_thread));
+    logger(10, "Command parser thread: ", tostring(out_cmd_thread));
+    local result
     -- thread.sleep(1000);
     logger(10, "Starting threads");
     result = thread.run(gps_tick_thread);
@@ -218,10 +344,12 @@ local start_threads = function (version)
     logger(10, "Firmware check start thread result is ", tostring(result));
     result = thread.run(config_update_thread);
     logger(10, "Config update start thread result is ", tostring(result));
+    result = thread.run(out_cmd_thread);
+    logger(10, "Command parser start thread result is ", tostring(result));
 
     logger(10, "Threads are running");
     local counter = 0
-    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) do
+    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) do
     --while thread.running(config_update_thread) do
         logger(10, "All threads still running");
         logger(10, "Peak memory used: ", getpeakmem());
@@ -232,6 +360,7 @@ local start_threads = function (version)
             thread.stop(cell_tick_thread);
             thread.stop(firmware_check_thread);
             thread.stop(config_update_thread);
+            thread.stop(out_cmd_thread);
             gps.gpsclose();
             break;
         end;
@@ -261,6 +390,7 @@ local start_threads = function (version)
     logger(30, "cell_tick_thread running: ", thread.running(cell_tick_thread));
     logger(30, "Firmware check thread running: ", thread.running(firmware_check_thread));
     logger(30, "Config update thread running: ", thread.running(config_update_thread));
+    logger(30, "Command parser thread running: ", thread.running(out_cmd_thread));
     logger(30, "Loop counter: ", counter);
     thread.sleep(2000)
     at.reset()

@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+from atlib import *
+import time
+import os
+import os.path
+import argparse
+import logging
+# module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
+# module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
+
+
+def transfer_files(port, *files):
+    try:
+        print "Opening port %s" % port
+        serial_port = serial.serial_for_url("rfc2217://10.1.1.5:" + port, 115200, timeout=5)
+
+        for filename in files:
+            print "asking for file %s" % filename
+            data = get_file(serial_port, filename)
+
+            f = open("/tmp/%s" % os.path.basename(filename), 'w')
+            f.write(data)
+            f.close()
+
+    finally:
+        serial_port.close()
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    
+    parser.add_argument(
+        '-p',
+        '--port',
+        help="The port of the serial device to connect to.",
+        default="9991",
+    )
+    parser.add_argument(
+        '-f',
+        '--filename',
+        help="The filename of the file to transfer from the device, including the directory.",
+        required=True,
+    )
+    args = parser.parse_args()
+
+    logger = logging.getLogger('')
+    logger.setLevel(logging.INFO)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    print "Callout out to transfer\n"
+
+    transfer_files(args.port, args.filename)

@@ -1,9 +1,12 @@
 local _M = {}
+local logging = require("logging")
+local logger = logging.create("system", 30)
+
 
 local quarantined_as_string = function()
     local file = io.open("c:/quarantined","r")
     if( not file ) then
-        print("No file, so not quarantined\r\n")
+        logger(10, "No file, so not quarantined\r\n")
         return false
     end
 
@@ -11,10 +14,10 @@ local quarantined_as_string = function()
     while true do
         local line = file:read("*l")
         if line == nil then
-            print("Reached end of file\r\n")
+            logger(0, "Reached end of file\r\n")
             break
         end
-        print("line is ", line, "<\r\n")
+        logger(10, "line is ", line, "<\r\n")
         return_str = return_str .. "|" .. line
     end
     return return_str
