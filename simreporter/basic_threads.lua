@@ -94,7 +94,7 @@ local function gps_tick()
             end;
             logger(10, "Result is ", tostring(result));
 
-            local nmea_data = nmea.getinfo(63);
+            local nmea_data = nmea.getinfo(511);
             if (nmea_data) then
                 logger(10, "nmea_data, len=", string.len(nmea_data));
                 local nmea_table = {}
@@ -214,8 +214,8 @@ end
 local start_threads = function (version)
     running_version = version;
 
-    network_setup.set_network_from_sms_operator();
-    vmsleep(2000);
+network_setup.set_network_from_sms_operator();
+vmsleep(2000);
     --[[for j=36,255 do
         for i=0,100 do
             logger(30, "setting for device: ", j, " and register: ", i)

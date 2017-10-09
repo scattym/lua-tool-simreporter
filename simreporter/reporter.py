@@ -5,35 +5,17 @@ import time
 import os
 import os.path
 import argparse
+import ConfigParser
 
+config = ConfigParser.RawConfigParser()
+config.read('release.cfg')
 # module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
+serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9991", 115200, timeout=5)
 # module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
 VERSION = "201709141"
 
-files = [
-    "aes.lua",
-    "at_abs.lua",
-    "at_commands.lua",
-    "basic_threads.lua",
-    "rsa_lib.lua",
-    "canary.lua",
-    "config.lua",
-    "device.lua",
-    "encapsulation.lua",
-    "firmware.lua",
-    "keygen.lua",
-    "json.lua",
-    "logging.lua",
-    "network_setup.lua",
-    "nmea_getinfo.lua",
-    "reporter.lua",
-    "system.lua",
-    "tcp_client.lua",
-    "util.lua",
-    "unzip.lua",
-]
+files = config.get('release', 'files').split(",")
 
 
 def zip_files():
