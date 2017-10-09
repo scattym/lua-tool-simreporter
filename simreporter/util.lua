@@ -42,6 +42,63 @@ local trim = function(s)
 end
 _M.trim = trim
 
+-- gsplit: iterate over substrings in a string separated by a pattern
+--
+-- Parameters:
+-- text (string)    - the string to iterate over
+-- pattern (string) - the separator pattern
+-- plain (boolean)  - if true (or truthy), pattern is interpreted as a plain
+--                    string, not a Lua pattern
+--
+-- Returns: iterator
+--
+-- Usage:
+-- for substr in gsplit(text, pattern, plain) do
+--   doSomething(substr)
+-- end
+local function gsplit(text, pattern, plain)
+  local splitStart, length = 1, #text
+  return function ()
+    if splitStart then
+      local sepStart, sepEnd = string.find(text, pattern, splitStart, plain)
+      local ret
+      if not sepStart then
+        ret = string.sub(text, splitStart)
+        splitStart = nil
+      elseif sepEnd < sepStart then
+        -- Empty separator!
+        ret = string.sub(text, splitStart, sepStart)
+        if sepStart < length then
+          splitStart = sepStart + 1
+        else
+          splitStart = nil
+        end
+      else
+        ret = sepStart > splitStart and string.sub(text, splitStart, sepStart - 1) or ''
+        splitStart = sepEnd + 1
+      end
+      return ret
+    end
+  end
+end
+
+-- split: split a string into substrings separated by a pattern.
+--
+-- Parameters:
+-- text (string)    - the string to iterate over
+-- pattern (string) - the separator pattern
+-- plain (boolean)  - if true (or truthy), pattern is interpreted as a plain
+--                    string, not a Lua pattern
+--
+-- Returns: table (a sequence table containing the substrings)
+local function safe_split(text, pattern, plain)
+  local ret = {}
+  for match in gsplit(text, pattern, plain) do
+    table.insert(ret, match)
+  end
+  return ret
+end
+
 local response_to_array = function(response, key, key_val_sep, field_sep, field_name_array)
     local return_table = {}
     logger.log("util", 0, "response string is ", tostring(response))
@@ -59,7 +116,7 @@ local response_to_array = function(response, key, key_val_sep, field_sep, field_
             logger.log("util", 0, "Found key: ", key, " in line: ", line_array[num])
             local key_value_arr = split(line_array[num], key_val_sep)
             if #key_value_arr == 2 then
-                local field_array = split(key_value_arr[2], field_sep)
+                local field_array = safe_split(key_value_arr[2], field_sep, true)
                 if field_array == nil then
                     logger.log("util", 30, "Unable to split key/value pair. Field array is nil");
                 elseif #field_array ~= #field_name_array then

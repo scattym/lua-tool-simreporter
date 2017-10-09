@@ -29,6 +29,11 @@ local run_command = function(cmd)
     return return_string;
 end;
 
+-- Manufacturer: SIMCOM INCORPORATED
+-- Model: SIMCOM_SIM5320A
+-- Revision: SIM5320A_V1.5
+-- IMEI: 012813008945935
+-- +GCAP: +CGSM,+DS,+ES
 local get_device_info = function()
     response = run_command("ATI")
     return response;
@@ -36,6 +41,8 @@ end;
 
 _M.get_device_info = get_device_info
 
+-- +CCINFO:[SCELL],UARFCN:4436,MCC:505,MNC:001,LAC:338,ID:14302219,PSC:214,SSC:0,RSCP:88,ECIO:8.0,RXLev:-88dbm,TXPWR:0
+-- +CCINFO:[NCell1],UARFCN:4436,PSC:230,SSC:0,RSCP:97,ECIO:15.5,RXLev:-97dbm
 local get_cell_info = function()
     response = run_command("AT+CCINFO");
     return response;
@@ -59,12 +66,14 @@ local get_cops = function()
 end;
 _M.get_cops = get_cops
 
+-- +CBC: 0,94,4.145V
 local get_cbc = function()
     response = run_command("AT+CBC");
     return response;
 end;
 _M.get_cbc = get_cbc
 
+--+CCLK: "80/01/11,23:48:23+32"
 local get_cclk = function()
     response = run_command("AT+CCLK?");
     return response;
@@ -72,24 +81,28 @@ end;
 _M.get_cclk = get_cclk
 
 
+-- 012813008945935
 local get_cgsn = function()
     response = run_command("AT+CGSN");
     return response;
 end;
 _M.get_cgsn = get_cgsn
 
+-- SIMCOM INCORPORATED
 local get_cgmi = function()
     response = run_command("AT+CGMI");
     return response;
 end;
 _M.get_cgmi = get_cgmi
 
+-- SIMCOM_SIM5320A
 local get_cgmm = function()
     response = run_command("AT+CGMM");
     return response;
 end;
 _M.get_cgmm = get_cgmm
 
+-- +CGMR: 1575B14SIM5320A
 local get_cgmr = function()
     response = run_command("AT+CGMR");
     return response;

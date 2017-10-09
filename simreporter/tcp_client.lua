@@ -77,6 +77,10 @@ local make_http_post = function(host, url, data, headers)
     logger.log("tcp_client", 0, "URL is ", tostring(url));
     logger.log("tcp_client", 0, "data is ", tostring(data));
     local http_req = "";
+    local data_length = 0
+    if data ~= nil then
+        data_length = tostring(#data)
+    end
     http_req = http_req .. "POST " .. tostring(url) .. " ";
     http_req = http_req .. "HTTP/1.1\r\nHost: ";
     http_req = http_req .. tostring(host);
@@ -90,7 +94,7 @@ local make_http_post = function(host, url, data, headers)
     end
     http_req = http_req .. "Content-Type: application/octet-stream\r\n";
     http_req = http_req .. "Connection: close\r\n";
-    http_req = http_req .. "Content-Length: " .. string.len(tostring(data)) .. "\r\n";
+    http_req = http_req .. "Content-Length: " .. data_length .. "\r\n";
     http_req = http_req .. "\r\n";
     http_req = http_req .. tostring(data);
 
@@ -150,22 +154,33 @@ local client_id_to_app_handle = function(client_id, create_if_not_exists)
 
 end;
 
+local send_all = function(socket_fd, data, timeout)
+    local try_count = 0
+    local sent = 0
+    local err_code = 0
+    while sent < #data do
+        local sent_len
+        local bytes_to_send = #data-sent
+        if bytes_to_send > 1300 then
+            bytes_to_send = 1300
+        end
+        local end_byte = sent + bytes_to_send
+        logger.log("tcp_client", 0, "Bytes to send is ", bytes_to_send, " end byte is ", end_byte, " bytes sent so far is ", sent, " err_code is ", err_code, " data length is ", #data, " data length minus sent ", #data-sent)
+        err_code, sent_len = socket.send(socket_fd, data:sub(sent+1, end_byte), timeout);
+        sent = sent + sent_len
+        logger.log("tcp_client", 0, "Bytes sent so far is ", sent, " err_code is ", err_code)
+        if err_code ~= 0 then
+            return err_code, sent_len
+        end
+        thread.sleep(100)
+    end
+    return err_code, sent
+end
+
 --[[
-
-
-
 error code definition
-
-
-
-SOCK_RST_SOCK_FAILED and SOCK_RST_NETWORK_FAILED are fatal errors, 
-
-
-
+SOCK_RST_SOCK_FAILED and SOCK_RST_NETWORK_FAILED are fatal errors,
 when they happen, the socket cannot be used to transfer data further.
-
-
-
 ]]
 local send_data = function(client_id, host, port, data)
 
@@ -247,7 +262,7 @@ local send_data = function(client_id, host, port, data)
             -- local http_req = "POST /process_update HTTP/1.1\r\nHost: www.scattym.com\r\nUser-Agent: Mozilla/5.0 (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\nAccept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\nKeep-Alive: 115\r\nConnection: keep-alive\r\n\r\n";
             logger.log("tcp_client", 0, "socket.send..., len=", string.len(data));
             local timeout = 30000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
-            local err_code, sent_len = socket.send(socket_fd, data, timeout);
+            local err_code, sent_len = send_all(socket_fd, data, timeout);
             logger.log("tcp_client", 0, "socket.send ", err_code, ", ", sent_len);
             local http_resp = ""
             if (err_code and (err_code == SOCK_RST_OK)) then

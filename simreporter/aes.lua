@@ -1140,12 +1140,15 @@ local function encrypt(password, data, keyLength, mode, iv)
 	assert(password ~= nil, "Empty password.")
 	assert(data ~= nil, "Empty data.")
     -- logger(0, "Password: ", password)
-    -- logger(0, "data: ", data)
+    logger(0, "data length ", #data, " data: ", data)
+
 	local mode = mode or _M.CBCMODE
 	local keyLength = keyLength or _M.AES128
 
 	local key = pwToKey(password, keyLength, iv)
 	local paddedData = util.padByteString(data)
+    --logger(0, "padded data length ", #paddedData)
+
 
 	if mode == _M.ECBMODE then
 		return ciphermode.encryptString(key, paddedData, ciphermode.encryptECB, iv)
