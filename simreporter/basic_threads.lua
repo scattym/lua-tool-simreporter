@@ -13,6 +13,7 @@ local logging = require("logging")
 local keygen = require("keygen")
 local rsa = require("rsa_lib")
 local network_setup = require("network_setup")
+local aes = require("aes")
 
 local logger = logging.create("basic_threads", 30)
 
@@ -138,6 +139,7 @@ local function cell_tick()
 
     while (true) do
         logger(10, "Cell data thread waking up");
+
         if last_cell_report_has_expired() then
             --key_data["iv"] = rsa.bytes_to_num(keygen.create_key(128))
             --tcp.open_network(client_id);
@@ -211,128 +213,80 @@ local function process_out_cmd()
     end
 end
 
+local function testing_thread()
+    while ( true ) do
+        local cell_table = device.get_device_info_table()
+        local nmea_data = nmea.getinfo(511);
+        local data = '{"version":"1","packet_number":4,"nmea":"$GPGSV,4,1,16,28,65,202,34,07,40,077,27,17,43,348,27,13,36,230,27*7B|$GPGSV,4,2,16,15,07,219,16,05,02,282,16,08,09,140,16,11,28,104,15*76|$GPGSV,4,3,16,19,23,341,15,30,68,118,14,01,16,084,,09,07,015,*72|$GPGSV,4,4,16,04,,,,32,,,,31,,,,29,,,*72|$GPGGA,031924.0,3348.948974,S,15112.009167,E,1,06,1.2,84.5,M,0,M,,*52|$GPVTG,NaN,T,,M,0.0,N,0.0,K,A*42|$GPRMC,031924.0,A,3348.948974,S,15112.009167,E,0.0,0.0,141017,,,A*70|$GPGSA,A,3,07,11,13,17,19,28,,,,,,,3.1,1.2,2.9*39|","device_info":"|Manufacturer: SIMCOM INCORPORATED|Model: SIMCOM_SIM5320A|Revision: SIM5320A_V1.5|IMEI: 012813008945935|+GCAP: +CGSM,+DS,+ES||OK|","packet_count":0}'
+        if (nmea_data) then
+            local encrypted = aes.encrypt("password", data, aes.AES128, aes.CBCMODE)
+            local decrypted = aes.decrypt("password", encrypted, aes.AES128, aes.CBCMODE)
+            if data ~= decrypted then
+                logger(30, "Decryption failed")
+                logger(30, data)
+                logger(30, decrypted)
+            end
+            collectgarbage()
+
+        end;
+
+        thread.sleep(2000)
+
+        --[[for j=1,127 do
+            for i=1,63 do
+                logger(30, "setting for device: ", j, " and register: ", i)
+                i2c.write_i2c_dev(j, i, 101, 1)
+                thread.sleep(100)
+                local a, b, c, d = i2c.read_i2c_dev(j, i, 4)
+                logger(30, "Read: ", a, " ", b, " ", c, " ", d)
+                thread.sleep(100)
+            end
+        end]]--
+
+        --[[spi.set_clk(0, 1, 1);
+        logger(30, "set_cs")
+        spi.set_cs(1, 1);
+        logger(30, "set_freq")
+        spi.set_freq(1000, 500000, 1000);
+        logger(30, "set_num_bits")
+        spi.set_num_bits(8, 0, 0);
+        logger(30, "config_device")
+        spi.config_device();
+        spi.write(141, 42, 1)
+        while true do
+            for i=1,100 do
+                spi.write(65, i, 1)
+                a, b, c, d = spi.read(i, 1)
+                logger(30, "a:", tostring(a), ",b:", tostring(b), ",c:", tostring(c), ",d:", tostring(d))
+                thread.sleep(100)
+            end
+            spi.write(10, 101, 1)
+
+            thread.sleep(1000)
+        end]]--
+    end
+end
+
 local start_threads = function (version)
     running_version = version;
 
-network_setup.set_network_from_sms_operator();
-vmsleep(2000);
-    --[[for j=36,255 do
-        for i=0,100 do
-            logger(30, "setting for device: ", j, " and register: ", i)
-            i2c.write_i2c_dev(j, i, 101, 1)
-            thread.sleep(100)
-        end
-    end]]--
+    network_setup.set_network_from_sms_operator();
+    vmsleep(2000);
+
 
     logger(10, "Start of start_threads")
-    --[[spi.set_clk(0, 1, 1);
-    logger(30, "set_cs")
-    spi.set_cs(1, 1);
-    logger(30, "set_freq")
-    spi.set_freq(1000, 500000, 1000);
-    logger(30, "set_num_bits")
-    spi.set_num_bits(8, 0, 0);
-    logger(30, "config_device")
-    spi.config_device();
-    spi.write(141, 42, 1)
-    while true do
-        for i=1,100 do
-            spi.write(65, i, 1)
-            a, b, c, d = spi.read(i, 1)
-            logger(30, "a:", tostring(a), ",b:", tostring(b), ",c:", tostring(c), ",d:", tostring(d))
-            thread.sleep(100)
-        end
-        spi.write(10, 101, 1)
-
-        thread.sleep(1000)
-    end]]--
-
-    --[[while true do
-        for clock_mode=0,1 do
-        --for clock_mode=1,1 do
-            for clk_pol=0,1 do
-            --for clk_pol=1,1 do
-                for tranfer_mode=0,1 do
-                --for tranfer_mode=1,1 do
-                    for cs_mode=0,1 do
-                        for cs_pol=0,1 do
-                            logger(30, "clock_mode: ", clock_mode, " clk_pol: ", clk_pol, " tranfer_mode: ", tranfer_mode, " cs_mode: ", cs_mode, " cs_pol: ", cs_pol)
-                            logger(30, "set_freq")
-                            spi.set_freq(10000, 10000, 1000);
-                            logger(30, "set_num_bits")
-                            spi.set_num_bits(8, 0, 0);
-                            logger(30, "config_device")
-                            spi.set_clk(clock_mode, clk_pol, tranfer_mode);
-                            thread.sleep(100)
-                            spi.set_cs(cs_mode, cs_pol);
-                            thread.sleep(100)
-                            spi.config_device();
-                            thread.sleep(100)
-                            for i=1,10 do
-                                --    self.dev_write(0x2A, 0x8D)
-                                --    self.dev_write(0x2B, 0x3E)
-                                --    self.dev_write(0x2D, 30)
-                                --    self.dev_write(0x2C, 0)
-                                --    self.dev_write(0x15, 0x40)
-                                --    self.dev_write(0x11, 0x3D)
-                                --    self.dev_write(0x26, (self.antenna_gain<<4))
-
-                                spi.write(141, 42, 1)
-                                thread.sleep(100)
-                                spi.write(62, 43, 1)
-                                thread.sleep(100)
-                                spi.write(30, 45, 1) -- spi.write(30, 0x2D, 1)
-                                thread.sleep(100)
-                                spi.write(0, 44, 1) -- spi.write(0, 0x2C, 1)
-                                thread.sleep(100)
-                                spi.write(64, 21, 1) -- spi.write(0x40, 0x15, 1)
-                                thread.sleep(100)
-                                spi.write(61, 17, 1) -- spi.write(0x3D, 0x11, 1)
-                                thread.sleep(100)
-                                logger(30, "Attempting to read from device.")
-                                for j=1,3 do
-                                    spi.write(65, 0, 1)
-                                    spi.write(65, 0, 1)
-                                    spi.write(65, 0, 1)
-                                    spi.write(65, 0, 1)
-                                    thread.sleep(100)
-                                    spi.write(10, 0, 1)
-                                    thread.sleep(100)
-                                    logger(30, "Attempting spi read.")
-                                    a, b, c, d = spi.read(0, 1) -- local a, b, c, d = spi.read(0x04, 4)
-                                    thread.sleep(100)
-                                    logger(30, "Attempting to print values.")
-                                    logger(30, "a:", tostring(a), ",b:", tostring(b), ",c:", tostring(c), ",d:", tostring(d))
-                                end
-                            end
-                            logger(30, "Sleeping for 1 second")
-                            thread.sleep(1000)
-                        end
-                    end
-                end
-            end
-        end
-    end]]--
-
-
-
-    -- logging.set_log_file("c:/log.txt")
-    --logger(10, "Trying to load config first time\r\n")
-    --local config_load_result = config.load_config_from_file()
-    --logger(10, "Config load result is ", config_load_result, "\r\n")
-    --logger(10, "Trying to save config to file")
-    --local config_save_result = config.save_config_to_file()
-    --logger(10, "Save config result is ", config_save_result)
     local gps_tick_thread = thread.create(gps_tick)
     local cell_tick_thread = thread.create(cell_tick)
     local firmware_check_thread = thread.create(get_firmware_version)
     local config_update_thread = thread.create(get_config)
     local out_cmd_thread = thread.create(process_out_cmd)
+    local test_thread = thread.create(testing_thread)
     logger(10, "GPS tick thread: ", tostring(gps_tick_thread));
     logger(10, "cell_tick_thread: ", tostring(cell_tick_thread));
     logger(10, "Firmware check thread: ", tostring(firmware_check_thread));
     logger(10, "Config update thread: ", tostring(config_update_thread));
-    logger(10, "Command parser thread: ", tostring(out_cmd_thread));
+    logger(10, "Command parser thread: ", tostring(out_cmd_thread))
+    logger(10, "Test thread: ", tostring(test_thread))
     local result
     -- thread.sleep(1000);
     logger(10, "Starting threads");
@@ -346,10 +300,12 @@ vmsleep(2000);
     logger(10, "Config update start thread result is ", tostring(result));
     result = thread.run(out_cmd_thread);
     logger(10, "Command parser start thread result is ", tostring(result));
+    result = thread.run(test_thread);
+    logger(10, "Command parser start thread result is ", tostring(result));
 
     logger(10, "Threads are running");
     local counter = 0
-    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) do
+    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread) do
     --while thread.running(config_update_thread) do
         logger(10, "All threads still running");
         logger(10, "Peak memory used: ", getpeakmem());
@@ -361,6 +317,7 @@ vmsleep(2000);
             thread.stop(firmware_check_thread);
             thread.stop(config_update_thread);
             thread.stop(out_cmd_thread);
+            thread.stop(test_thread);
             gps.gpsclose();
             break;
         end;

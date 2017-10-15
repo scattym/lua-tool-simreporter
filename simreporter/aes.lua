@@ -3,6 +3,8 @@ local _M = {}
 local util = require("util")
 local logging = require("logging")
 local logger = logging.create("aes", 30)
+--local bit = require("bit")
+--local hash = require("hash")
 
 --local bit = require("bit")
 local function _W(f) local e=setmetatable({}, {__index = _ENV or getfenv()}) if setfenv then setfenv(f, e) end return f(e) or e end
@@ -273,23 +275,6 @@ local function toHexString(data)
 end
 
 local function padByteString(data)
-	local dataLength = #data
-
-	local random1 = math.random(0,255)
-	local random2 = math.random(0,255)
-
-	local prefix = string.char(random1,
-		random2,
-		random1,
-		random2,
-		getByte(dataLength, 3),
-		getByte(dataLength, 2),
-		getByte(dataLength, 1),
-		getByte(dataLength, 0)
-	)
-
-	-- data = prefix .. data
-
 	local paddingLength = math.ceil(#data/16)*16 - #data
 	local padding = ""
 	for i=1,paddingLength do
@@ -300,27 +285,20 @@ local function padByteString(data)
 	return data .. padding
 end
 
-local function properlyDecrypted(data)
-	local random = {string.byte(data,1,4)}
-
-	if (random[1] == random[3] and random[2] == random[4]) then
-		return true
-	end
-
-	return false
-end
-
 local function unpadByteString(data)
-	if (not properlyDecrypted(data)) then
-		return nil
+	for i=1,15 do
+		local found = true
+		for j=1,i do
+			if string.byte(data:sub(-j, -j)) ~= i then
+				found = false
+			end
+		end
+		if found == true then
+			return data:sub(1, -i-1)
+		end
 	end
 
-	local dataLength = putByte(string.byte(data,5), 3)
-					 + putByte(string.byte(data,6), 2)
-					 + putByte(string.byte(data,7), 1)
-					 + putByte(string.byte(data,8), 0)
-
-	return string.sub(data,9,8+dataLength)
+	return data
 end
 
 local function xorIV(data, iv)
@@ -389,7 +367,6 @@ return {
 	hexToBytes = hexToBytes,
 	toHexString = toHexString,
 	padByteString = padByteString,
-	properlyDecrypted = properlyDecrypted,
 	unpadByteString = unpadByteString,
 	xorIV = xorIV,
 	increment = increment,
@@ -1034,10 +1011,11 @@ function public.decryptString(key, data, modeFunction, iv)
 		local byteData = {string.byte(data,offset,offset +15)}
 
 		iv = modeFunction(keySched, byteData, iv)
-
+		--print(string.char(unpack(byteData)))
 		buffer.addString(decryptedData, string.char(unpack(byteData)))
 	end
-
+	--print(decryptedData)
+	--print(buffer.toString(decryptedData))
 	return buffer.toString(decryptedData)
 end
 
@@ -1102,6 +1080,7 @@ local function pwToKey(password, keyLength, iv)
 	local hash = sha256.init()
 	hash:update(password)
     local checksum = hash:final()
+	--local checksum = "AAAAAAAAAAAAAAAA"
     --logger(0, "Checksum is: ", util.tohex(checksum))
 	return {string.byte(checksum,1,keyLength)}
 --[[
@@ -1149,7 +1128,7 @@ local function encrypt(password, data, keyLength, mode, iv)
 	local paddedData = util.padByteString(data)
     --logger(0, "padded data length ", #paddedData)
 
-
+	collectgarbage()
 	if mode == _M.ECBMODE then
 		return ciphermode.encryptString(key, paddedData, ciphermode.encryptECB, iv)
 	elseif mode == _M.CBCMODE then
@@ -1178,26 +1157,26 @@ _M.encrypt = encrypt
 -- mode and keyLength must be the same for encryption and decryption.
 --
 local function decrypt(password, data, keyLength, mode, iv)
-	local mode = mode or CBCMODE
-	local keyLength = keyLength or AES128
+	local mode = mode or _M.CBCMODE
+	local keyLength = keyLength or _M.AES128
 
 	local key = pwToKey(password, keyLength, iv)
     --logger(0, "Key: ", util.tohex(key))
 	local plain
-	if mode == ECBMODE then
+	if mode == _M.ECBMODE then
 		plain = ciphermode.decryptString(key, data, ciphermode.decryptECB, iv)
-	elseif mode == CBCMODE then
+	elseif mode == _M.CBCMODE then
 		plain = ciphermode.decryptString(key, data, ciphermode.decryptCBC, iv)
-	elseif mode == OFBMODE then
+	elseif mode == _M.OFBMODE then
 		plain = ciphermode.decryptString(key, data, ciphermode.decryptOFB, iv)
-	elseif mode == CFBMODE then
+	elseif mode == _M.CFBMODE then
 		plain = ciphermode.decryptString(key, data, ciphermode.decryptCFB, iv)
-	elseif mode == CTRMODE then
+	elseif mode == _M.CTRMODE then
 		plain = ciphermode.decryptString(key, data, ciphermode.decryptCTR, iv)
 	else
 		error("Unknown mode", 2)
 	end
-
+	--print(plain)
 	result = util.unpadByteString(plain)
 
 	if (result == nil) then

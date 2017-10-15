@@ -101,6 +101,30 @@ local make_http_post = function(host, url, data, headers)
     return http_req;
 end
 
+local make_http_post_headers = function(host, url, length, headers)
+    logger.log("tcp_client", 0, "Host is ", tostring(host));
+    logger.log("tcp_client", 0, "URL is ", tostring(url));
+    logger.log("tcp_client", 0, "data is ", tostring(data));
+    local http_req = "";
+    http_req = http_req .. "POST " .. tostring(url) .. " ";
+    http_req = http_req .. "HTTP/1.1\r\nHost: ";
+    http_req = http_req .. tostring(host);
+    http_req = http_req .. "\r\n";
+    http_req = http_req .. "User-Agent: Mozilla/5.0 (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
+    http_req = http_req .. "Authorization: bc733796ca38178dbee79f68ba4271e97fe170d4\r\n";
+    http_req = http_req .. "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n";
+    http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n";
+    for key, value in pairs(headers) do
+        http_req = http_req .. key .. ": " .. value .. "\r\n"
+    end
+    http_req = http_req .. "Content-Type: application/octet-stream\r\n";
+    http_req = http_req .. "Connection: close\r\n";
+    http_req = http_req .. "Content-Length: " .. length .. "\r\n";
+    http_req = http_req .. "\r\n";
+
+    return http_req;
+end
+
 local open_network = function(client_id)
     --Following is a sample of changing some common parameters, it is not required.
     --config_network_common_parameters();
@@ -182,7 +206,7 @@ error code definition
 SOCK_RST_SOCK_FAILED and SOCK_RST_NETWORK_FAILED are fatal errors,
 when they happen, the socket cannot be used to transfer data further.
 ]]
-local send_data = function(client_id, host, port, data)
+local send_data = function(client_id, host, port, ...)
 
     SOCK_RST_OK = 0
     SOCK_RST_TIMEOUT = 1
@@ -260,16 +284,29 @@ local send_data = function(client_id, host, port, data)
             logger.log("tcp_client", 0, "connect server succeeded");
             socket.select(socket_fd, SOCK_CLOSE_EVENT);--care for close event
             -- local http_req = "POST /process_update HTTP/1.1\r\nHost: www.scattym.com\r\nUser-Agent: Mozilla/5.0 (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\nAccept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\nKeep-Alive: 115\r\nConnection: keep-alive\r\n\r\n";
-            logger.log("tcp_client", 0, "socket.send..., len=", string.len(data));
             local timeout = 30000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
-            local err_code, sent_len = send_all(socket_fd, data, timeout);
-            logger.log("tcp_client", 0, "socket.send ", err_code, ", ", sent_len);
+            local total_length = 0
+            local total_sent_length = 0
+            local err_code = 0
+            for i, value in ipairs(arg) do
+                if value ~= nil and value ~= "" then
+                    total_length = total_length + #value
+                    local sent_len = 0
+                    err_code, sent_len = socket.send(socket_fd, value, timeout);
+                    total_sent_length = total_sent_length + sent_len
+                end
+            end
+            if total_sent_length < total_length then
+                logger.log("tcp_client", 30, "Not all data sent. err_code:", err_code, ", sent_len:", total_sent_length, ", data length:", #total_length);
+            end
+            logger.log("tcp_client", 0, "socket.send ", err_code, ", ", total_sent_length);
             local http_resp = ""
             if (err_code and (err_code == SOCK_RST_OK)) then
                 logger.log("tcp_client", 0, "socket.recv()...");
                 local timeout = 15000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
 
                 while( err_code ~= SOCK_CLOSE_EVENT ) do
+                    local fragment = ""
                     err_code, fragment = socket.recv(socket_fd, timeout);
                     logger.log("tcp_client", 0, "socket.recv(), err_code=", err_code);
                     if( fragment ) then
@@ -280,7 +317,9 @@ local send_data = function(client_id, host, port, data)
                 logger.log("tcp_client", 0, "c(", client_id , "):Error code is now: ", err_code)
                 if ( response ) then
                     result = true;
-                end;
+                end
+            else
+                logger.log("tcp_client", 30, "Error code is not as expected. err_code: ", err_code, " expecting: ", SOCK_RST_OK)
             end;
         end;
         logger.log("tcp_client", 0, "closing socket...");
@@ -401,6 +440,9 @@ end
 
 
 local http_open_send_close = function(client_id, host, port, url, data, headers, encrypt)
+    if data == nil then
+        data = ""
+    end
     if not headers then
         headers = {}
     end
@@ -415,21 +457,33 @@ local http_open_send_close = function(client_id, host, port, url, data, headers,
 
     local payload = ""
     if encrypt ~= false and data ~= nil and data ~= "" then
-        logger.log("tcp_client", 0, "About to encrypt payload");
-        -- encrypt(password, data, keyLength, mode, iv)
+
+        logger.log("tcp_client", 0, "About to encrypt payload: ", data);
+        collectgarbage()
         payload = aeslib.encrypt("password", data, aeslib.AES128, aeslib.CBCMODE)
-        --payload = data
         logger.log("tcp_client", 0, "Encrypted payload is ", util.tohex(payload));
+        logger.log("tcp_client", 10, "Encrypted payload length is ", #payload);
+        collectgarbage()
+
     else
+
         payload = data
         logger.log("tcp_client", 0, "Not encrypting ", tostring(payload));
+
+    end
+    local payload_length = 0
+    if payload ~= nil then
+        payload_length = #payload
     end
 
     if( not client_id ) then
         logger.log("tcp_client", 30, "Invalid client id: ", client_id);
     else
         logger.log("tcp_client", 20, "Callout to http://", host, ":", port, url)
-        result, response = send_data(client_id, host, port, make_http_post(host, url, payload, headers));
+        logger.log("tcp_client", 20, "Length is ", payload_length)
+        local http_preamble = make_http_post_headers(host, url, payload_length, headers)
+        local result, response = send_data(client_id, host, port, http_preamble, payload)
+        logger.log("tcp_client", 10, "Response is ", response)
         if( result and response ) then
             local headers, response_payload = parse_http_response(response);
             collectgarbage();

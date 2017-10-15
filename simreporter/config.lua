@@ -24,6 +24,7 @@ CONFIG["UPDATE_PORT"] = 65535
 CONFIG["CELL_PATH"] = "/v2/process_cell_update"
 CONFIG["GPS_PATH"] = "/v2/process_update"
 CONFIG["CONFIG_SLEEP_TIME"] = 30000
+CONFIG["REPORT_FLAGS"] = 0xFFFFFFFF
 
 local client_id = 4
 logger.create_logger("config", 30)
@@ -40,7 +41,8 @@ local MUST_BE_INTS = {
     "CELL_THREAD_SLEEP_TIME",
     "MIN_REPORT_TIME",
     "UPDATE_PORT",
-    "CONFIG_SLEEP_TIME"
+    "CONFIG_SLEEP_TIME",
+    "REPORT_FLAGS"
 }
 
 local MUST_BE_STRING = {

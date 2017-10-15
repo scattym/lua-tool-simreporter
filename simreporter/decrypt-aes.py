@@ -34,7 +34,9 @@ def decrypt(enc):
     # print(sha256.hexdigest())
     cipher = AES.new(key, AES.MODE_CBC, iv)
     # clear = unpad(cipher.decrypt(enc[16:]))
-    clear = unpad(cipher.decrypt(enc))
+    clear_padded = cipher.decrypt(enc)
+    print clear_padded
+    clear = unpad(clear_padded)
     binascii.hexlify(bytearray(clear))
     # print("Clear is %s" % clear)
     return clear.decode('utf8')
