@@ -12,6 +12,9 @@ def get_response(serial_port, sleep_time=0.25):
     return response
 
 
+def send_command(serial_port, command):
+    serial_port.write('%s\r\n' % command)
+
 def parse_file_length_message(msg):
     print "Parsing %s" % msg
     msg = msg.replace('\r', '').replace('\n', '')

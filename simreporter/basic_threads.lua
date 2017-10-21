@@ -14,6 +14,7 @@ local keygen = require("keygen")
 local rsa = require("rsa_lib")
 local network_setup = require("network_setup")
 local aes = require("aes")
+local out_command = require("out_command")
 
 local logger = logging.create("basic_threads", 30)
 
@@ -22,7 +23,7 @@ local last_cell_report = 0;
 local imei = at_abs.get_imei()
 local key = ""
 local enc_key = ""
-
+local EXTRA_INFO = {}
 local running_version;
 
 local function tohex(data)
@@ -88,6 +89,8 @@ local function gps_tick()
             current_loop = current_loop + 1
 
             local cell_table = device.get_device_info_table();
+            cell_table["extra_info"] = EXTRA_INFO
+
             local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
             local result, headers, payload = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, true);
             if result and headers["response_code"] == "200" then
@@ -145,6 +148,7 @@ local function cell_tick()
             --tcp.open_network(client_id);
             for i=1,1 do
                 local cell_table = device.get_device_info_table()
+                cell_table["extra_info"] = EXTRA_INFO
                 --cell_table["key"] = rsa.num_to_hex(key)
                 local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, config.get_config_value("NMEA_LOOP_COUNT"));
                 local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, key_data)
@@ -193,24 +197,21 @@ local function get_config()
     end
 end
 
-local function process_out_cmd()
-    local OUT_CMD_EVENT = 31
-    local count = 0
-
-    thread.setevtowner(31,31)
-
-    while ( true ) do
-        logger(30, "Waiting for an event")
-        evt, evt_param1, evt_param2, evt_param3, evt_clock = waitevt(99999999);
-        logger(30, "Out fo wait evt. evt: ", evt, " p1: ", evt_param1, " p2: ", evt_param2, " p3: ", evt_param3, " clock: ", evt_clock)
-        if (evt >= 0) then
-            count = count + 1
-            logger(30, "(count=", count, ")", os.clock(), " event = ", evt)
-            if ( evt == OUT_CMD_EVENT ) then
-                logger(30, "Got out command event. p1: ", evt_param1, " p2:", evt_param2, " p3:", evt_param3, " clock:", evt_clock)
-            end
-        end
+local parse_json_command = function(json_str)
+    local data = json.decode(json_str)
+    if data["metric"] and data["value"] then
+        logger(30, "Adding metric: ", data["metric"], " with value: ", data["value"])
+        local metric = data["metric"]
+        EXTRA_INFO[metric] = {}
+        EXTRA_INFO[metric]["clock"] = os.clock()
+        EXTRA_INFO[metric]["value"] = data["value"]
     end
+end
+
+local function process_out_cmd()
+    local callback_table = {}
+    callback_table[out_command.MESSAGE_TYPE_JSON] = parse_json_command
+    out_command.wait_and_parse_loop(callback_table)
 end
 
 local function testing_thread()
