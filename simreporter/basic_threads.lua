@@ -199,12 +199,10 @@ end
 
 local parse_json_command = function(json_str)
     local data = json.decode(json_str)
-    if data["metric"] and data["value"] then
-        logger(30, "Adding metric: ", data["metric"], " with value: ", data["value"])
-        local metric = data["metric"]
-        EXTRA_INFO[metric] = {}
-        EXTRA_INFO[metric]["clock"] = os.clock()
-        EXTRA_INFO[metric]["value"] = data["value"]
+    for key, value in pairs(data) do
+        EXTRA_INFO[key] = {}
+        EXTRA_INFO[key]["clock"] = os.clock()
+        EXTRA_INFO[key]["value"] = value
     end
 end
 

@@ -84,4 +84,4 @@ def split_message(message):
     read_all(serial_port)
 
 
-split_message('{"metric":"engine_rpm", "value": 1200}')
+split_message('{"engine_rpm": 1200}')
