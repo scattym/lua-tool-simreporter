@@ -14,7 +14,7 @@ local logging = require("logging")
 local logger = logging.create("lite_com", 0)
 
 local BUFFER = {}
-local BUFFER_TIMEOUT = 5
+local BUFFER_TIMEOUT = 30
 
 local get_byte = function(word, byte)
     a = {}
@@ -84,6 +84,9 @@ local parse_multi_message = function(client_id, packet_num, total_packets, word)
             add_word(client_id, packet_num, word)
         end
     else
+        if has_client_timed_out(client_id) then
+            logger.log(30, "Buffer has timed out for client id", client_id)
+        end
         BUFFER[client_id] = {}
         BUFFER[client_id]["total"] = total_packets
         BUFFER[client_id]["clock"] = os.clock()

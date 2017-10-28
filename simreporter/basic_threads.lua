@@ -15,6 +15,8 @@ local rsa = require("rsa_lib")
 local network_setup = require("network_setup")
 local aes = require("aes")
 local out_command = require("out_command")
+local mqtt_thread = require("mqtt_thread")
+local socket_thread = require("socket_thread")
 
 local logger = logging.create("basic_threads", 30)
 
@@ -73,6 +75,9 @@ end
 
 local function gps_tick()
     logger(10, "Starting gps tick function");
+    while(true) do
+        thread.sleep(10000)
+    end
     local client_id = 1;
     while (true) do
         logger(10, "GPS data thread waking up");
@@ -126,6 +131,9 @@ local function cell_tick()
     logger(10, "Starting cell data tick function");
     local client_id = 2;
     logger(30, "Enc start, clock is: ", tostring(os.clock()))
+    while(true) do
+        thread.sleep(10000)
+    end
 
 
 
@@ -175,6 +183,10 @@ end;
 local function get_firmware_version()
     logger(10, "Trying to retrieve firmware version");
     logger(10, "imei: ", imei)
+    while(true) do
+        thread.sleep(10000)
+    end
+
     local client_id = 3;
     while (true) do
         firmware.check_firmware_and_maybe_update(imei, running_version)
@@ -187,6 +199,10 @@ local function get_config()
     logger(10, "Trying to retrieve config");
     logger(10, "imei: ", imei)
     logger(10, "imei: ", running_version)
+    while(true) do
+        thread.sleep(10000)
+    end
+
     while (true) do
         local config_result = config.load_config_from_server(imei, running_version)
         logger(10, "Config load result was: ", config_result)
@@ -213,6 +229,10 @@ local function process_out_cmd()
 end
 
 local function testing_thread()
+
+    socket_thread.socket_thread(8, "home.scattym.com", 65534)
+    --mqtt_thread.mqtt_thread()
+    --[[
     while ( true ) do
         local cell_table = device.get_device_info_table()
         local nmea_data = nmea.getinfo(511);
@@ -229,7 +249,7 @@ local function testing_thread()
 
         end;
 
-        thread.sleep(2000)
+        thread.sleep(2000)]]
 
         --[[for j=1,127 do
             for i=1,63 do
@@ -263,7 +283,7 @@ local function testing_thread()
 
             thread.sleep(1000)
         end]]--
-    end
+    --end
 end
 
 local start_threads = function (version)

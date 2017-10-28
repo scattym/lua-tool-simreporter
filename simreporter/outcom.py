@@ -8,6 +8,7 @@ import time
 import os
 import os.path
 import argparse
+import json
 import ConfigParser
 
 config = ConfigParser.RawConfigParser()
@@ -79,9 +80,31 @@ def split_message(message):
         data = word32_to_bytes(message[i:i+4])
         command = "AT+CSCRIPTCMD=%s,%s" % (header, data)
         send_command(serial_port, command)
-        print get_response(serial_port, 0.05)
+        print get_response(serial_port, 0.2)
 
     read_all(serial_port)
 
+    # report = models.ForeignKey(device_models.Device, on_delete=models.CASCADE)
+    # engine_rpm = models.FloatField(null=True, blank=True)
+    # vehicle_speed = models.FloatField(null=True, blank=True)
+    # throttle_position = models.FloatField(null=True, blank=True)
+    # intake_air_temp = models.FloatField(null=True, blank=True)
+    # run_time = models.FloatField(null=True, blank=True)
+    # fuel_tank_level = models.FloatField(null=True, blank=True)
+    # distance_traveled = models.FloatField(null=True, blank=True)
+    # ambient_air_temperature = models.FloatField(null=True, blank=True)
 
-split_message('{"engine_rpm": 1200}')
+
+data = {
+    "obdii": {
+        "engine_rpm": 1200,
+        "vehicle_speed": 20,
+        "throttle_position": 50,
+        "intake_air_temp": 20,
+        "run_time": 2000,
+        "fuel_tank_level": 80,
+        "distance_traveled": 300,
+        "ambient_air_temperature": 36
+    }
+}
+split_message(json.dumps(data))

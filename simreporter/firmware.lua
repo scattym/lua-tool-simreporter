@@ -25,7 +25,7 @@ function get_firmware(imei, version)
     local fn_result = false
     --local open_net_result = tcp.open_network(client_id);
     --logger.log("firmware", 10, "Open network response is: ", open_net_result);
-    local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/get_firmware?ident=imei:" .. imei, "");
+    local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), "/get_firmware?ident=imei:" .. imei, "");
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 10, "Callout for firmware failed. Result was: ", result, " and response code: ", headers["response_code"])
     else

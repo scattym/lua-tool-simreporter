@@ -28,6 +28,7 @@ local run_command = function(cmd)
 
     return return_string;
 end;
+_M.run_command = run_command
 
 -- Manufacturer: SIMCOM INCORPORATED
 -- Model: SIMCOM_SIM5320A
