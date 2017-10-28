@@ -317,7 +317,7 @@ end
 
 local wait_read_events = function(timeout)
     local remote_closed = false;
-    print("wait_read_event, sockfd=", sockfd, ", timeout=", timeout, "\r\n");
+    logger(0, "wait_read_event, sockfd=", sockfd, ", timeout=", timeout, "\r\n");
     local start_tick = os.clock();
     while (true) do
         local cur_tick = os.clock();
@@ -327,7 +327,7 @@ local wait_read_events = function(timeout)
         end;
         local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(timeout);
         if (evt and evt >= 0) then
-            print("waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+            logger(0, "waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
         end;
         if (evt and evt == SOCKET_EVENT) then
             local sock_or_net_event = evt_p1;--0=>network event, usually ("LOST NETWORK"); 1=>socket event.
@@ -337,7 +337,7 @@ local wait_read_events = function(timeout)
                 if ((sock_or_net_event == 1) and (evt_sockfd == socket) and (bit.band(event_mask,SOCK_CLOSE_EVENT) ~= 0)) then
                     --socket closed by remote side
                     remote_closed = true;
-                    print("waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+                    logger(0, "waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
                     if (not socket.close(socket_fd)) then
                         logger(30, "1: failed to close socket");
                     else
@@ -345,7 +345,7 @@ local wait_read_events = function(timeout)
                     end;
                     return false, remote_closed;
                 elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_READ_EVENT) ~= 0)) then
-                    print("waited READ event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+                    logger(0, "waited READ event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
                     local err_code, fragment = socket.recv(socket_fd, timeout)
                     if( fragment ) then
                         logger(0, "Fragment is ", fragment)
@@ -376,7 +376,7 @@ local wait_read_event = function(sockfd, timeout)
     local SOCK_READ_EVENT = 2
     local SOCK_CLOSE_EVENT = 4
     local remote_closed = false;
-    print("wait_read_event, sockfd=", sockfd, ", timeout=", timeout, "\r\n");
+    logger(0, "wait_read_event, sockfd=", sockfd, ", timeout=", timeout, "\r\n");
     local start_tick = os.clock();
     while (true) do
         local cur_tick = os.clock();
@@ -390,23 +390,23 @@ local wait_read_event = function(sockfd, timeout)
 
         local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(timeout);
         if (evt and evt >= 0) then
-            print("waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+            logger(0, "waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
         end;
         if (evt and evt == SOCKET_EVENT) then
-            print("Event is a socket event\r\n")
+            logger(0, "Event is a socket event\r\n")
             local sock_or_net_event = evt_p1;--0=>network event, usually ("LOST NETWORK"); 1=>socket event.
             local evt_sockfd = evt_p2;
             local event_mask = evt_p3;
             if ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_CLOSE_EVENT) ~= 0)) then
                 --socket closed by remote side
-                print("Socket closed by remote side\r\n")
-                print("waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+                logger(0, "Socket closed by remote side\r\n")
+                logger(0, "waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
                 return true, true;
             elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_READ_EVENT) ~= 0)) then
-                print("waited READ event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+                logger(0, "waited READ event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
                 return true, false;
             else
-                print("Not socket read or close event\r\n")
+                logger(0, "Not socket read or close event\r\n")
             end;
         end;
         local cur_tick = os.clock();

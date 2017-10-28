@@ -11,7 +11,6 @@ local tcp = require("tcp_client")
 local logging = require("logging")
 local logger = logging.create("socket_thread", 30)
 
-
 local _M = {}
 
 local CLIENT_TO_SOCKET = {}

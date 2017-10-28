@@ -75,19 +75,16 @@ end
 
 local function gps_tick()
     logger(10, "Starting gps tick function");
-    while(true) do
-        thread.sleep(10000)
-    end
+
     local client_id = 1;
     while (true) do
         logger(10, "GPS data thread waking up");
         logger(10, "Turning gps on");
         gps.gpsstart(1);
         local gps_locked = wait_until_lock(config.get_config_value("GPS_LOCK_CHECK_MAX_LOOP"));
-        --thread.sleep(GPS_LOCK_TIME);
+
         logger(10, "Requesting nmea data");
-        --local open_net_result = tcp.open_network(client_id);
-        --logger(10, "Open network response is: ", open_net_result);
+
         local max_loop_count = config.get_config_value("NMEA_LOOP_COUNT")
         local current_loop = 0
         while max_loop_count == 0 or current_loop <= max_loop_count do
@@ -97,6 +94,7 @@ local function gps_tick()
             cell_table["extra_info"] = EXTRA_INFO
 
             local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
+
             local result, headers, payload = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, true);
             if result and headers["response_code"] == "200" then
                 update_last_cell_report();
@@ -131,11 +129,6 @@ local function cell_tick()
     logger(10, "Starting cell data tick function");
     local client_id = 2;
     logger(30, "Enc start, clock is: ", tostring(os.clock()))
-    while(true) do
-        thread.sleep(10000)
-    end
-
-
 
     --[[key, enc_key = keygen.create_and_encrypt_key(128)
     logger(30, "Key is: ", key);
@@ -199,9 +192,6 @@ local function get_config()
     logger(10, "Trying to retrieve config");
     logger(10, "imei: ", imei)
     logger(10, "imei: ", running_version)
-    while(true) do
-        thread.sleep(10000)
-    end
 
     while (true) do
         local config_result = config.load_config_from_server(imei, running_version)

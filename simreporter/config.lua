@@ -46,13 +46,17 @@ local MUST_BE_INTS = {
     "MIN_REPORT_TIME",
     "UPDATE_PORT",
     "CONFIG_SLEEP_TIME",
-    "REPORT_FLAGS"
+    "REPORT_FLAGS",
+    "SOCK_PORT",
+    "MQ_PORT",
 }
 
 local MUST_BE_STRING = {
     "CELL_PATH",
     "UPDATE_HOST",
     "GPS_PATH",
+    "SOCK_HOST",
+    "MQ_HOST",
     "checksum"
 }
 
