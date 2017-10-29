@@ -10,11 +10,13 @@ import os.path
 import argparse
 import json
 import ConfigParser
+from random import randint
 
 config = ConfigParser.RawConfigParser()
 config.read('release.cfg')
 device = config.get('release', 'device')
 
+print("Device is %s" % (device,))
 # module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
 serial_port = serial.serial_for_url(device, 115200, timeout=5)
 # module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
@@ -66,21 +68,26 @@ def word32_to_bytes(word):
 
 
 def split_message(message):
-    packets = len(message)/4
-    padding = 0
-    if len(message) % 4 != 0:
-        padding = 4 - len(message) % 4
-        packets += 1
-    print("Padding is %s" % (padding,))
-    for i in range(0, padding):
-        message = message + chr(0)
+    for _ in range(0,100):
+        packets = len(message)/4
+        padding = 0
+        if len(message) % 4 != 0:
+            padding = 4 - len(message) % 4
+            packets += 1
+        print("Padding is %s" % (padding,))
+        for i in range(0, padding):
+            message = message + chr(0)
 
-    for i in range(0, len(message), 4):
-        header = build_header(1, 1, (i/4)+1, packets)
-        data = word32_to_bytes(message[i:i+4])
-        command = "AT+CSCRIPTCMD=%s,%s" % (header, data)
-        send_command(serial_port, command)
-        print get_response(serial_port, 0.2)
+        for i in range(0, len(message), 4):
+            header = build_header(1, 1, (i/4)+1, packets)
+            data = word32_to_bytes(message[i:i+4])
+            command = "AT+CSCRIPTCMD=%s,%s" % (header, data)
+            send_command(serial_port, command)
+            response = get_response(serial_port, 0.3)
+
+        while "true" not in response:
+            print("Waiting for module transfer to complete.")
+            response = get_response(serial_port, 2)
 
     read_all(serial_port)
 
@@ -97,14 +104,14 @@ def split_message(message):
 
 data = {
     "obdii": {
-        "engine_rpm": 1200,
-        "vehicle_speed": 20,
-        "throttle_position": 50,
-        "intake_air_temp": 20,
-        "run_time": 2000,
-        "fuel_tank_level": 80,
-        "distance_traveled": 300,
-        "ambient_air_temperature": 36
+        "engine_rpm": randint(800, 1200),
+        "vehicle_speed": randint(0, 120),
+        "throttle_position": randint(0, 90),
+        "intake_air_temp": randint(19, 36),
+        "run_time": randint(0, 1000),
+        "fuel_tank_level": randint(0, 100),
+        "distance_traveled": randint(10, 200),
+        "ambient_air_temperature": randint(40, 80)
     }
 }
 split_message(json.dumps(data))
