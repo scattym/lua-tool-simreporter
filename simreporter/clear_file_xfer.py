@@ -2,15 +2,13 @@
 from atlib import *
 import time
 import serial
+import ConfigParser
 
-
-#module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-device = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
-# module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
+serial_port = open_config_port()
 
 try:
-    while "OK" not in get_response(device):
-        device.write("at\r\n" * 100)
+    while "OK" not in get_response(serial_port):
+        serial_port.write("at\r\n" * 100)
 
 finally:
-    device.close()
+    serial_port.close()

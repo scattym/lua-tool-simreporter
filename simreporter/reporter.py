@@ -9,13 +9,10 @@ import ConfigParser
 
 config = ConfigParser.RawConfigParser()
 config.read('release.cfg')
-# module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
-# module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
 VERSION = "201709141"
-
 files = config.get('release', 'files').split(",")
+serial_port = open_config_port()
 
 
 def zip_files():
@@ -38,7 +35,7 @@ def file_is_newer_than(file1, file2):
 
 def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader, only_file):
     try:
-        set_autorun(serial_port, False)
+        # set_autorun(serial_port, False)
         if initial_reset:
             reset(serial_port)
             response = get_response(serial_port, 2)
@@ -63,7 +60,7 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
                 if os.path.isfile(filename):
                     if "lua" in filename:
                         if file_is_newer_than(filename, "lastupload/" + filename) or force_all_files:
-                            print "Putting file " + filename
+                            print("Putting file %s" % filename)
                             with open(filename, 'r') as content_file:
                                 content = content_file.read()
                                 put_file(serial_port, "c:/libs/" + directory + "/" + filename, content)

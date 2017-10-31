@@ -9,17 +9,9 @@ import os
 import os.path
 import argparse
 import json
-import ConfigParser
 from random import randint
 
-config = ConfigParser.RawConfigParser()
-config.read('release.cfg')
-device = config.get('release', 'device')
-
-print("Device is %s" % (device,))
-# module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-serial_port = serial.serial_for_url(device, 115200, timeout=5)
-# module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
+serial_port = open_config_port()
 
 
 def set_message_type(word, message_type):

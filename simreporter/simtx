@@ -9,9 +9,10 @@ import argparse
 # module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
 # module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
+
 def transfer_files(port, directory, *args):
     try:
-        serial_port = serial.serial_for_url("rfc2217://10.1.1.5:" + port, 115200, timeout=5)
+        serial_port = open_config_port()
         if directory:
             change_dir(serial_port, directory)
         else:
@@ -19,13 +20,14 @@ def transfer_files(port, directory, *args):
 
         for filename in args:  # os.listdir("."):
             if os.path.isfile(filename):
-                print "Putting file " + filename
+                print("Putting file " + filename)
                 with open(filename, 'r') as content_file:
                     content = content_file.read()
                     put_file(serial_port, directory + "/" + os.path.basename(filename), content)
     
     finally:
         serial_port.close()
+
 
 if __name__ == '__main__':
 
