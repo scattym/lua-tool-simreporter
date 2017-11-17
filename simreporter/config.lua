@@ -19,16 +19,18 @@ CONFIG["GPS_LOCK_CHECK_MAX_LOOP"] = 50
 CONFIG["FIRMWARE_SLEEP_TIME"] = 3600000
 CONFIG["CELL_THREAD_SLEEP_TIME"] = 7200000
 CONFIG["MIN_REPORT_TIME"] = 7195
-CONFIG["UPDATE_HOST"] = "home.scattym.com"
+CONFIG["UPDATE_HOST"] = "services.do.scattym.com"
 CONFIG["UPDATE_PORT"] = 65535
-CONFIG["MQ_HOST"] = "home.scattym.com"
+CONFIG["MQ_HOST"] = "services.do.scattym.com"
 CONFIG["MQ_PORT"] = 65534
-CONFIG["SOCK_HOST"] = "home.scattym.com"
+CONFIG["SOCK_HOST"] = "services.do.scattym.com"
 CONFIG["SOCK_PORT"] = 65533
 CONFIG["CELL_PATH"] = "/v2/process_cell_update"
 CONFIG["GPS_PATH"] = "/v2/process_update"
 CONFIG["CONFIG_SLEEP_TIME"] = 30000
 CONFIG["REPORT_FLAGS"] = 0xFFFFFFFF
+CONFIG["ENABLE_TCP"] = false
+CONFIG["TCP_SLEEP_TIME"] = 600000
 
 local client_id = 4
 logger.create_logger("config", 30)
@@ -49,6 +51,7 @@ local MUST_BE_INTS = {
     "REPORT_FLAGS",
     "SOCK_PORT",
     "MQ_PORT",
+    "TCP_SLEEP_TIME",
 }
 
 local MUST_BE_STRING = {
@@ -58,6 +61,10 @@ local MUST_BE_STRING = {
     "SOCK_HOST",
     "MQ_HOST",
     "checksum"
+}
+
+local MUST_BE_BOOLEAN = {
+    "ENABLE_TCP",
 }
 
 local function tohex(data)
@@ -101,6 +108,9 @@ local check_value_type = function(key, value)
         if string.equal(field, key) then
             if type(value) == "number" then
                 return true
+            else
+                logger.log("config", 30, "Invalid type for field: ", field, " expecting number but is ", type(value))
+                return false
             end
         end
     end
@@ -108,6 +118,19 @@ local check_value_type = function(key, value)
         if string.equal(field, key) then
             if type(value) == "string" then
                 return true
+            else
+                logger.log("config", 30, "Invalid type for field: ", field, " expecting string but is ", type(value))
+                return false
+            end
+        end
+    end
+    for _, field in ipairs(MUST_BE_BOOLEAN) do
+        if string.equal(field, key) then
+            if type(value) == "boolean" then
+                return true
+            else
+                logger.log("config", 30, "Invalid type for field: ", field, " expecting string but is ", type(value))
+                return false
             end
         end
     end

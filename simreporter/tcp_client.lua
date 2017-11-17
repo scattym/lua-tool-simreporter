@@ -103,10 +103,10 @@ local make_http_post = function(host, url, data, headers)
     http_req = http_req .. "HTTP/1.1\r\nHost: ";
     http_req = http_req .. tostring(host);
     http_req = http_req .. "\r\n";
-    http_req = http_req .. "User-Agent: Mozilla/5.0 (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
+    http_req = http_req .. "User-Agent: SimCom/1.0\r\n" -- (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
     http_req = http_req .. "Authorization: bc733796ca38178dbee79f68ba4271e97fe170d4\r\n";
-    http_req = http_req .. "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n";
-    http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n";
+    http_req = http_req .. "Accept: text/html\r\n" -- ,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n";
+    -- http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n";
     for key, value in pairs(headers) do
         http_req = http_req .. key .. ": " .. value .. "\r\n"
     end
@@ -128,10 +128,10 @@ local make_http_post_headers = function(host, url, length, headers)
     http_req = http_req .. "HTTP/1.1\r\nHost: ";
     http_req = http_req .. tostring(host);
     http_req = http_req .. "\r\n";
-    http_req = http_req .. "User-Agent: Mozilla/5.0 (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
+    http_req = http_req .. "User-Agent: SimCom/1.0\r\n" -- (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
     http_req = http_req .. "Authorization: bc733796ca38178dbee79f68ba4271e97fe170d4\r\n";
-    http_req = http_req .. "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n";
-    http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n";
+    http_req = http_req .. "Accept: text/html\r\n" --,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n";
+    --http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n";
     for key, value in pairs(headers) do
         http_req = http_req .. key .. ": " .. value .. "\r\n"
     end

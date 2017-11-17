@@ -12,7 +12,6 @@ config.read('release.cfg')
 
 VERSION = "201709141"
 files = config.get('release', 'files').split(",")
-serial_port = open_config_port()
 
 
 def zip_files():
@@ -34,12 +33,19 @@ def file_is_newer_than(file1, file2):
 
 
 def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader, only_file):
+    serial_port = open_config_port()
+
     try:
-        # set_autorun(serial_port, False)
+        set_autorun(serial_port, False)
         if initial_reset:
             reset(serial_port)
             response = get_response(serial_port, 2)
-            while "START" not in response:
+            serial_port.close()
+            print("Sleeeping")
+            time.sleep(14)
+            print("Resuming")
+            serial_port.open()
+            while "PB DONE" not in response:
                 print("Waiting for module to start.")
                 response = get_response(serial_port, 2)
             time.sleep(13)

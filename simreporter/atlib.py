@@ -4,12 +4,12 @@ import os
 import ConfigParser
 
 
-def open_config_port():
+def open_config_port(speed=115200):
     config = ConfigParser.RawConfigParser()
     config.read('release.cfg')
     device = config.get('release', 'device')
     try:
-        serial_port = serial.serial_for_url(device, 115200, timeout=5)
+        serial_port = serial.serial_for_url(device, speed, timeout=5)
     except ValueError as err:
         if err.message == "remote rejected value for option 'baudrate'":
             serial_port = serial.serial_for_url(device, timeout=5)
