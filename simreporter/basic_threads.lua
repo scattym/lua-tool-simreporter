@@ -75,6 +75,7 @@ end
 
 local function gps_tick()
     logger(10, "Starting gps tick function");
+    local failure_count = 0
 
     local client_id = 1;
     while (true) do
@@ -109,6 +110,16 @@ local function gps_tick()
                 local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
 
                 local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("GPS_PATH"), encapsulated_payload, {}, true);
+                if result and headers["response_code"] == "200" then
+                    failure_count = 0
+                else
+                    logger(30, "GPS update failed. Result is ", tostring(result), " and response is ", response);
+                    failure_count = failure_count + 1
+                    if failure_count > config.get_config_value("MAX_FAILURE_COUNT") then
+                        logger(30, "Max failure count reached. Resetting device.");
+                        at.reset()
+                    end
+                end
                 logger(10, "Result is ", tostring(result), " and response is ", response);
             end;
             collectgarbage();
@@ -140,6 +151,7 @@ local function cell_tick()
     key_data["key"] = key
     key_data["enc_key"] = enc_key]]--
     local key_data = true
+    local failure_count = 0
 
     while (true) do
         logger(10, "Cell data thread waking up");
@@ -155,9 +167,15 @@ local function cell_tick()
                 local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, key_data)
                 logger(10, "Result is ", tostring(result), " and response is ", response);
                 if result and headers["response_code"] == "200" then
+                    failure_count = 0
                     update_last_cell_report();
                 else
-                    logger(30, "Update failed. Result is ", tostring(result), " and response is ", response);
+                    logger(30, "Cell update failed. Result is ", tostring(result), " and response is ", response);
+                    failure_count = failure_count + 1
+                    if failure_count > config.get_config_value("MAX_FAILURE_COUNT") then
+                        logger(30, "Max failure count reached. Resetting device.");
+                        at.reset()
+                    end
                 end;
                 collectgarbage();
                 thread.sleep(config.get_config_value("NMEA_SLEEP_TIME"));

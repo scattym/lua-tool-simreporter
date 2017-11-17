@@ -31,6 +31,7 @@ CONFIG["CONFIG_SLEEP_TIME"] = 30000
 CONFIG["REPORT_FLAGS"] = 0xFFFFFFFF
 CONFIG["ENABLE_TCP"] = false
 CONFIG["TCP_SLEEP_TIME"] = 600000
+CONFIG["MAX_FAILURE_COUNT"] = 10
 
 local client_id = 4
 logger.create_logger("config", 30)
@@ -52,6 +53,7 @@ local MUST_BE_INTS = {
     "SOCK_PORT",
     "MQ_PORT",
     "TCP_SLEEP_TIME",
+    "MAX_FAILURE_COUNT",
 }
 
 local MUST_BE_STRING = {
