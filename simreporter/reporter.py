@@ -15,7 +15,8 @@ files = config.get('release', 'files').split(",")
 
 
 def zip_files():
-    cmd = "~/git/zlib/contrib/minizip/minizip %s.zip %s" % (VERSION,  " ".join(files))
+    cmd = "~/git/zlib/contrib/minizip/minizip %s.zip %s" % (
+        VERSION, " ".join(files))
     print(cmd)
     result = os.system(cmd)
     print("Result is %s" % result)
@@ -32,7 +33,8 @@ def file_is_newer_than(file1, file2):
     return True
 
 
-def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader, only_file):
+def transfer_and_build_files(
+        directory, initial_reset, force_all_files, send_loader, only_file):
     serial_port = open_config_port()
 
     try:
@@ -42,10 +44,10 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
             response = get_response(serial_port, 2)
             serial_port.close()
             print("Sleeeping")
-            time.sleep(14)
+            time.sleep(12)
             print("Resuming")
             serial_port.open()
-            while "PB DONE" not in response:
+            while "PB DONE" not in response and "CME ERROR" not in response:
                 print("Waiting for module to start.")
                 response = get_response(serial_port, 2)
             time.sleep(13)
@@ -65,11 +67,18 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
             if only_file is None or only_file == filename:
                 if os.path.isfile(filename):
                     if "lua" in filename:
-                        if file_is_newer_than(filename, "lastupload/" + filename) or force_all_files:
+                        if file_is_newer_than(
+                                filename, "lastupload/" + filename) or force_all_files:
                             print("Putting file %s" % filename)
                             with open(filename, 'r') as content_file:
                                 content = content_file.read()
-                                put_file(serial_port, "c:/libs/" + directory + "/" + filename, content)
+                                put_file(
+                                    serial_port,
+                                    "c:/libs/" +
+                                    directory +
+                                    "/" +
+                                    filename,
+                                    content)
                                 # delete_file(module, file)
                             touch("lastupload/" + filename)
                             compile_files.append(filename)
@@ -77,17 +86,17 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
                             print("File %s is not newer than last uploaded version" % (
                                 filename
                             ))
-    
+
         # for file in files:  # os.listdir("."):
         #     compiled = file.replace(".lua", ".out")
         #     delete_file(module, compiled)
         time.sleep(2)
         for filename in compile_files:  # os.listdir("."):
             compile_file(serial_port, "c:/libs/" + directory + "/" + filename)
-    
+
         for filename in compile_files:  # os.listdir("."):
             delete_file(serial_port, filename)
-    
+
         change_dir(serial_port, "c:/")
         if send_loader:
             with open("loader.lua", 'r') as content_file:
@@ -100,7 +109,7 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
 
         # compile_file(module, "reporter.lua")
         ls(serial_port)
-    
+
         # run_script(module, "reporter.out")
         # stop_script(module)
         # while(script_is_running(module)):
@@ -113,9 +122,11 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
         #    run_script(module, "nmea_getinfo.out")
 
         # getresponse(module, 1)
-    
+
         set_autorun(serial_port, True)
-    
+
+        turn_off_power_check(serial_port)
+
         # run_script(serial_port, "canary.out")
         # stop_script(serial_port)
         # counter = 0
@@ -136,9 +147,10 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
             print("Error starting script. Resetting module.")
             reset(serial_port)
         read_all(serial_port)
-    
+
     finally:
         serial_port.close()
+
 
 if __name__ == '__main__':
 
@@ -192,4 +204,9 @@ if __name__ == '__main__':
     if args.zip_files:
         zip_files()
     else:
-        transfer_and_build_files(args.directory, not args.no_initial_reset, args.force_all_files, args.loader, args.transfer_file)
+        transfer_and_build_files(
+            args.directory,
+            not args.no_initial_reset,
+            args.force_all_files,
+            args.loader,
+            args.transfer_file)

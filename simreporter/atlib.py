@@ -48,8 +48,8 @@ def parse_file_payload(payload):
                 size = parse_file_length_message(payload[start:i])
                 if size != 0:
                     print ("size is %s" % (size,))
-                    return_data += payload[line_end+1:line_end+1+size]
-                    start = line_end+1+size
+                    return_data += payload[line_end + 1:line_end + 1 + size]
+                    start = line_end + 1 + size
                     i = start
             else:
                 i = i + 1
@@ -103,7 +103,7 @@ def put_file(serial_port, filename, file_contents):
         end = i + block_size
         if end >= file_length:
             end = file_length
-            print(file_contents[end-5:end])
+            print(file_contents[end - 5:end])
         print("Sending range %s to %s" % (i, end))
         serial_port.write(file_contents[i:end])
         serial_port.flush()
@@ -140,7 +140,7 @@ def put_binary_file(serial_port, filename, file_contents):
     get_response(serial_port)
 
     for i in range(0, len(file_contents), 2048):
-        serial_port.write(file_contents[i:i+2048])
+        serial_port.write(file_contents[i:i + 2048])
         time.sleep(1)
     # serial_port.write(file_contents)
     # time.sleep(10)
@@ -152,6 +152,13 @@ def put_binary_file(serial_port, filename, file_contents):
 
 def change_dir(serial_port, directory):
     serial_port.write('AT+FSCD=%s\r\n' % directory)
+    response = get_response(serial_port)
+    if "OK" not in response:
+        raise ValueError(response)
+
+
+def turn_off_power_check(serial_port):
+    serial_port.write('AT+CPWRONCHK=0\r\n')
     response = get_response(serial_port)
     if "OK" not in response:
         raise ValueError(response)
