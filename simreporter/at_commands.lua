@@ -185,6 +185,15 @@ local get_cgsockcont = function()
 end;
 _M.get_cgsockcont = get_cgsockcont
 
+
+
+local get_pwr_on_check = function()
+    response = run_command("AT+CPWRONCHK?");
+    return response;
+end;
+_M.get_pwr_on_check = get_pwr_on_check
+
+
 local change_dir = function(directory)
     response = run_command("AT+FSCD=c:/"..directory);
     return response;
