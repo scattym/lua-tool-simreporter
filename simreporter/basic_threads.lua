@@ -80,55 +80,65 @@ local function gps_tick()
     local client_id = 1;
     while (true) do
         logger(10, "GPS data thread waking up");
-        logger(10, "Turning gps on");
-        gps.gpsstart(1);
-        local gps_locked = wait_until_lock(config.get_config_value("GPS_LOCK_CHECK_MAX_LOOP"));
-
-        logger(10, "Requesting nmea data");
-
-        local max_loop_count = config.get_config_value("NMEA_LOOP_COUNT")
-        local current_loop = 0
-        while max_loop_count == 0 or current_loop <= max_loop_count do
-            current_loop = current_loop + 1
-
-            local cell_table = device.get_device_info_table();
-            cell_table["extra_info"] = EXTRA_INFO
-
-            local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
-
-            local result, headers, payload = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, true);
-            if result and headers["response_code"] == "200" then
-                update_last_cell_report();
-            end;
-            logger(10, "Result is ", tostring(result));
-
-            local nmea_data = nmea.getinfo(511);
-            if (nmea_data) then
-                logger(10, "nmea_data, len=", string.len(nmea_data));
-                local nmea_table = {}
-                nmea_table["nmea"] = nmea_data
-                local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
-
-                local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("GPS_PATH"), encapsulated_payload, {}, true);
+        local battery_table = at_abs.get_battery_table()
+        local battery_percent = tonumber(battery_table["battery_percent"])
+        if not battery_percent then
+            logger(30, "No battery level returned. Setting to 0.");
+            battery_percent = 0
+        end
+        if battery_percent < 10 then
+            logger(30, "Battery level too low. Not turning on GPS.");
+        else
+            logger(10, "Turning gps on");
+            gps.gpsstart(1);
+            local gps_locked = wait_until_lock(config.get_config_value("GPS_LOCK_CHECK_MAX_LOOP"));
+    
+            logger(10, "Requesting nmea data");
+    
+            local max_loop_count = config.get_config_value("NMEA_LOOP_COUNT")
+            local current_loop = 0
+            while max_loop_count == 0 or current_loop <= max_loop_count do
+                current_loop = current_loop + 1
+    
+                local cell_table = device.get_device_info_table();
+                cell_table["extra_info"] = EXTRA_INFO
+    
+                local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
+    
+                local result, headers, payload = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, true);
                 if result and headers["response_code"] == "200" then
-                    failure_count = 0
-                else
-                    logger(30, "GPS update failed. Result is ", tostring(result), " and response is ", response);
-                    failure_count = failure_count + 1
-                    if failure_count > config.get_config_value("MAX_FAILURE_COUNT") then
-                        logger(30, "Max failure count reached. Resetting device.");
-                        at.reset()
+                    update_last_cell_report();
+                end;
+                logger(10, "Result is ", tostring(result));
+    
+                local nmea_data = nmea.getinfo(511);
+                if (nmea_data) then
+                    logger(10, "nmea_data, len=", string.len(nmea_data));
+                    local nmea_table = {}
+                    nmea_table["nmea"] = nmea_data
+                    local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
+    
+                    local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("GPS_PATH"), encapsulated_payload, {}, true);
+                    if result and headers["response_code"] == "200" then
+                        failure_count = 0
+                    else
+                        logger(30, "GPS update failed. Result is ", tostring(result), " and response is ", response);
+                        failure_count = failure_count + 1
+                        if failure_count > config.get_config_value("MAX_FAILURE_COUNT") then
+                            logger(30, "Max failure count reached. Resetting device.");
+                            at.reset()
+                        end
                     end
-                end
-                logger(10, "Result is ", tostring(result), " and response is ", response);
+                    logger(10, "Result is ", tostring(result), " and response is ", response);
+                end;
+                collectgarbage();
+                thread.sleep(config.get_config_value("NMEA_SLEEP_TIME"));
+                max_loop_count = config.get_config_value("NMEA_LOOP_COUNT") -- Ensure we exit if config changes
             end;
-            collectgarbage();
-            thread.sleep(config.get_config_value("NMEA_SLEEP_TIME"));
-            max_loop_count = config.get_config_value("NMEA_LOOP_COUNT") -- Ensure we exit if config changes
-        end;
-        -- tcp.close_network(client_id);
-        logger(10, "Turning gps off");
-        gps.gpsclose();
+            -- tcp.close_network(client_id);
+            logger(10, "Turning gps off");
+            gps.gpsclose();
+        end
         logger(10, "Sleeping");
         logger(10, "GPS data thread sleeping for ", config.get_config_value("REPORT_INTERVAL") / 1000, " seconds");
         collectgarbage();

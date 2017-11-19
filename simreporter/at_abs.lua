@@ -47,6 +47,19 @@ local get_location = function()
 end
 _M.get_location = get_location
 
+
+-- AT+CBC
+-- +CBC: 0,78,4.030V
+-- OK
+local get_battery_table = function()
+    local cbc_fields = {"battery_inuse", "battery_percent", "battery_voltage"}
+    local cbc_response = at.get_cbc();
+    local cbc_table = util.response_to_array(cbc_response, "+CBC", ":", ",", cbc_fields);
+    util.print_simple_table("cbc_table", cbc_table);
+    return cbc_table;
+end
+_M.get_battery_table = get_battery_table
+
 local is_location_valid = function()
     local location = get_location();
     if location["lat"] and location["lat"] ~= "" then
