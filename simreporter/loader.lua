@@ -178,3 +178,4 @@ local status, result = pcall(basic_threads.start_threads(running_version))
 print("exit main thread\r\n");
 
 print(result);
+sio.send("AT+CRESET\r\n")
