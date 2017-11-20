@@ -73,6 +73,73 @@ local function wait_until_lock(iterations)
     return false
 end
 
+local IS_CHARGING = true
+local function set_charging(value)
+    thread.enter_cs(6)
+    IS_CHARGING = value
+    thread.leave_cs(6)
+end
+
+function is_charging()
+    if config.get_config_value("CHECK_FOR_CHARGING") == "false" then
+        return true
+    end
+    local return_val
+    thread.enter_cs(6)
+    return_val = IS_CHARGING
+    thread.leave_cs(6)
+    return return_val
+end
+
+local function charging_check()
+    local down_count = 0
+    local up_count = 0
+    local prev_level = 0
+    while true do
+        local battery_table = at_abs.get_battery_table()
+        local battery_percent = tonumber(battery_table["battery_percent"])
+        if not battery_percent then
+            battery_percent = 0
+        end
+        if battery_percent > config.get_config_value("MAX_BAT_PERCENT_CHARGE_CHECK") then
+            logger(30, "Battery above high water marker. Setting charging true. Battery level: ", battery_percent)
+            set_charging(true)
+            up_count = 0
+            down_count = 0
+        else
+            local battery_voltage_str = battery_table["battery_voltage"]
+
+            if battery_voltage_str then
+
+                local battery_voltage = tonumber((battery_voltage_str:gsub("V", "")))
+
+                if battery_voltage < prev_level then
+                    down_count = down_count + 1
+                    up_count = 0
+                    if down_count >= config.get_config_value("MAX_VOLT_DROP_COUNT") then
+                        logger(30, "Max volt drop count reached. Set charging false.")
+                        set_charging(false)
+                        up_count = 0
+                        down_count = 0
+                    end
+                end
+                if battery_voltage > prev_level then
+                    up_count = up_count + 1
+                    if up_count >= config.get_config_value("MAX_VOLT_GAIN_COUNT") then
+                        logger(30, "Battery is charging.")
+                        set_charging(true)
+                        up_count = 0
+                        down_count = 0
+                    end
+                end
+                prev_level = battery_voltage
+            end
+        end
+        thread.sleep(config.get_config_value("CHARGING_CHECK_THREAD_SLEEP_TIME"))
+    end
+
+end
+
 local function gps_tick()
     logger(10, "Starting gps tick function");
     local failure_count = 0
@@ -86,8 +153,8 @@ local function gps_tick()
             logger(30, "No battery level returned. Setting to 0.");
             battery_percent = 0
         end
-        if battery_percent < 10 then
-            logger(30, "Battery level too low. Not turning on GPS.");
+        if battery_percent < config.get_config_value("MIN_BAT_PERCENT_FOR_GPS") or not is_charging() then
+            logger(30, "Battery level too low, or not charging. Not turning on GPS.");
         else
             logger(10, "Turning gps on");
             gps.gpsstart(1);
@@ -97,7 +164,7 @@ local function gps_tick()
     
             local max_loop_count = config.get_config_value("NMEA_LOOP_COUNT")
             local current_loop = 0
-            while max_loop_count == 0 or current_loop <= max_loop_count do
+            while (max_loop_count == 0 or current_loop <= max_loop_count) and is_charging() do
                 current_loop = current_loop + 1
     
                 local cell_table = device.get_device_info_table();
@@ -318,12 +385,14 @@ local start_threads = function (version)
     local config_update_thread = thread.create(get_config)
     local out_cmd_thread = thread.create(process_out_cmd)
     local test_thread = thread.create(testing_thread)
+    local charging_check_thread = thread.create(charging_check)
     logger(10, "GPS tick thread: ", tostring(gps_tick_thread));
     logger(10, "cell_tick_thread: ", tostring(cell_tick_thread));
     logger(10, "Firmware check thread: ", tostring(firmware_check_thread));
     logger(10, "Config update thread: ", tostring(config_update_thread));
     logger(10, "Command parser thread: ", tostring(out_cmd_thread))
     logger(10, "Test thread: ", tostring(test_thread))
+    logger(10, "Charging check thread: ", tostring(charging_check_thread))
     local result
     -- thread.sleep(1000);
     logger(10, "Starting threads");
@@ -339,10 +408,12 @@ local start_threads = function (version)
     logger(10, "Command parser start thread result is ", tostring(result));
     result = thread.run(test_thread);
     logger(10, "Command parser start thread result is ", tostring(result));
+    result = thread.run(charging_check_thread)
+    logger(10, "Charging check start thread result is ", tostring(result));
 
     logger(10, "Threads are running");
     local counter = 0
-    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread) do
+    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) do
     --while thread.running(config_update_thread) do
         logger(10, "All threads still running");
         logger(10, "Peak memory used: ", getpeakmem());
@@ -355,6 +426,7 @@ local start_threads = function (version)
             thread.stop(config_update_thread);
             thread.stop(out_cmd_thread);
             thread.stop(test_thread);
+            thread.stop(charging_check_thread);
             gps.gpsclose();
             break;
         end;
@@ -385,6 +457,7 @@ local start_threads = function (version)
     logger(30, "Firmware check thread running: ", thread.running(firmware_check_thread));
     logger(30, "Config update thread running: ", thread.running(config_update_thread));
     logger(30, "Command parser thread running: ", thread.running(out_cmd_thread));
+    logger(30, "Charging check thread running: ", thread.running(charging_check_thread));
     logger(30, "Loop counter: ", counter);
     thread.sleep(2000)
     at.reset()

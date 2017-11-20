@@ -24,7 +24,7 @@ _M.send_data = send_data
 
 local socket_thread = function(client_id)
     while true do
-        if config.get_config_value("ENABLE_TCP") then
+        if config.get_config_value("ENABLE_TCP") == "true" then
             local connected = false
             local result, socket_fd = tcp.connect_host(client_id, config.get_config_value("SOCK_HOST"), config.get_config_value("SOCK_PORT"))
             if result and socket_fd ~= -1 then

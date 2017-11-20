@@ -23,6 +23,8 @@ local get_device_info_table = function()
     cell_table["max_memory"] = system.get_max_memory();
     cell_table["usb_mode"] = get_usb_mode()
     cell_table["pwr_on_check"] = at.get_pwr_on_check()
+    cell_table["is_charging"] = is_charging()
+
     return cell_table;
 end;
 _M.get_device_info_table = get_device_info_table

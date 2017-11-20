@@ -8,7 +8,7 @@ local CONFIG ={}
 -- Time to sleep between successive nmea reports
 CONFIG["NMEA_SLEEP_TIME"] = 30000
 -- Report GPS at this interval. Turns off GPS in between
-CONFIG["REPORT_INTERVAL"] = 3600000
+CONFIG["REPORT_INTERVAL"] = 30000
 -- Number of NMEA reports to send every REPORT_INTERVAL, set to 0 for infinite
 CONFIG["NMEA_LOOP_COUNT"] = 100
 CONFIG["MAIN_THREAD_SLEEP"] = 60000
@@ -29,9 +29,15 @@ CONFIG["CELL_PATH"] = "/v2/process_cell_update"
 CONFIG["GPS_PATH"] = "/v2/process_update"
 CONFIG["CONFIG_SLEEP_TIME"] = 30000
 CONFIG["REPORT_FLAGS"] = 0xFFFFFFFF
-CONFIG["ENABLE_TCP"] = false
+CONFIG["ENABLE_TCP"] = "false"
 CONFIG["TCP_SLEEP_TIME"] = 600000
 CONFIG["MAX_FAILURE_COUNT"] = 10
+CONFIG["MAX_VOLT_DROP_COUNT"] = 5
+CONFIG["MAX_VOLT_GAIN_COUNT"] = 2
+CONFIG["MIN_BAT_PERCENT_FOR_GPS"] = 10
+CONFIG["MAX_BAT_PERCENT_CHARGE_CHECK"] = 90
+CONFIG["CHARGING_CHECK_THREAD_SLEEP_TIME"] = 15000
+CONFIG["CHECK_FOR_CHARGING"] = "true"
 
 local client_id = 4
 logger.create_logger("config", 30)
@@ -54,6 +60,13 @@ local MUST_BE_INTS = {
     "MQ_PORT",
     "TCP_SLEEP_TIME",
     "MAX_FAILURE_COUNT",
+    "MAX_VOLT_DROP_COUNT",
+    "MAX_VOLT_GAIN_COUNT",
+    "MAX_BAT_PERCENT_CHARGE_CHECK",
+    "MIN_BAT_PERCENT_FOR_GPS",
+    "CHARGING_CHECK_THREAD_SLEEP_TIME",
+    "ENABLE_TCP",
+    "CHECK_FOR_CHARGING",
 }
 
 local MUST_BE_STRING = {
@@ -66,7 +79,7 @@ local MUST_BE_STRING = {
 }
 
 local MUST_BE_BOOLEAN = {
-    "ENABLE_TCP",
+    "NONE",
 }
 
 local function tohex(data)
