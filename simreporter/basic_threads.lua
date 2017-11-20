@@ -371,12 +371,26 @@ local function testing_thread()
     --end
 end
 
+local function get_battery_percent()
+    local battery_table = at_abs.get_battery_table()
+    local battery_percent = tonumber(battery_table["battery_percent"])
+    if not battery_percent then
+        logger(30, "No battery level returned. Setting to 0.");
+        battery_percent = 0
+    end
+    return battery_percent
+end
+
 local start_threads = function (version)
     running_version = version;
 
     network_setup.set_network_from_sms_operator();
     vmsleep(2000);
 
+    while get_battery_percent() < config.get_config_value("MIN_BAT_PERCENT_FOR_BOOT") do
+        logger(30, "Battery level too low not starting threads.");
+        thread.sleep(10000)
+    end
 
     logger(10, "Start of start_threads")
     local gps_tick_thread = thread.create(gps_tick)
