@@ -11,9 +11,58 @@ function prequire(...)
     print("unable to load ", ..., "\r\n")
     return nil
 end
+
+function split(str, delim)
+    local result,pat,lastPos = {},"(.-)" .. delim .. "()",1
+    for part, pos in string.gfind(str, pat) do
+        table.insert(result, part); lastPos = pos
+    end
+    table.insert(result, string.sub(str, lastPos))
+    return result
+end
+
 DEBUG_LEVEL = 10
 vmsleep(7000);
 printdir(1);
+sio.clear()
+sio.send("ATE0\r\n")
+local MIN_BAT_LEVEL = 5
+local ate_response = sio.recv(5000)
+
+local function get_battery_level()
+    local bat_percent = 0
+    sio.clear()
+    sio.send("AT+CBC\r\n")
+    local battery_response = sio.recv(5000)
+    local batt_table = split(battery_response, "\r\n")
+    for i,line in pairs(batt_table) do
+        print("Line is " .. line .. "\r\n")
+        if line:match("+CBC:") then
+            print("In cbc line\r\n")
+            local line_table = split(line, ",")
+            if #line_table == 3 then
+                print("Matched. Battery is at " .. line_table[2] .. "\r\n")
+                bat_percent = tonumber(line_table[2])
+                if not bat_percent then
+                    print("Battery percentage not retrieved. Setting to 0\r\n")
+                    bat_percent = 0
+                end
+            else
+                print("Count does not match" .. #line_table .. "\r\n")
+            end
+        end
+    end
+    return bat_percent
+end
+
+while get_battery_level() < MIN_BAT_LEVEL do
+    print("Battery level to low. Sleeping\r\n")
+    vmsleep(5000)
+end
+print("Battery ok.\r\n")
+sio.send("ATE1\r\n")
+ate_response = sio.recv(5000)
+
 
 quarantine_version = function(version)
     print("Quarantining version: ", version, "\r\n")
