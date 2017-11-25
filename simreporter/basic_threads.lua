@@ -209,6 +209,7 @@ local function gps_tick()
                         logger(10, "nmea_data, len=", string.len(nmea_data));
                         local nmea_table = {}
                         nmea_table["nmea"] = nmea_data
+                        nmea_table["cell_info"] = at.get_cell_info()
                         local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
 
                         local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("GPS_PATH"), encapsulated_payload, {}, true);
