@@ -41,6 +41,7 @@ CONFIG["CHARGING_CHECK_THREAD_SLEEP_TIME"] = 15000
 CONFIG["CHECK_FOR_CHARGING"] = "true"
 CONFIG["MIN_BAT_PERCENT_FOR_BOOT"] = 12
 CONFIG["MIN_GPS_REPORT_TIME"] = 3600
+CONFIG["REPORT_CELL_WITH_GPS"] = "true"
 
 local client_id = 4
 logger.create_logger("config", 30)
@@ -81,7 +82,8 @@ local MUST_BE_STRING = {
     "GPS_PATH",
     "SOCK_HOST",
     "MQ_HOST",
-    "checksum"
+    "checksum",
+    "REPORT_CELL_WITH_GPS",
 }
 
 local MUST_BE_BOOLEAN = {
