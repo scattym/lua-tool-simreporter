@@ -127,7 +127,7 @@ local function charging_check()
             battery_percent = 0
         end
         if battery_percent > config.get_config_value("MAX_BAT_PERCENT_CHARGE_CHECK") then
-            logger(30, "Battery above high water marker. Setting charging true. Battery level: ", battery_percent)
+            logger(10, "Battery above high water marker. Setting charging true. Battery level: ", battery_percent)
             set_charging(true)
             up_count = 0
             down_count = 0
@@ -193,16 +193,18 @@ local function gps_tick()
                 while (max_loop_count == 0 or current_loop <= max_loop_count) and (is_charging() or last_gps_report_has_expired()) do
                     current_loop = current_loop + 1
 
-                    local cell_table = device.get_device_info_table();
-                    cell_table["extra_info"] = EXTRA_INFO
+                    if config.get_config_value("REPORT_CELL_WITH_GPS") == "true" then
+                        local cell_table = device.get_device_info_table();
+                        cell_table["extra_info"] = EXTRA_INFO
 
-                    local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
+                        local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
 
-                    local result, headers, payload = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, true);
-                    if result and headers["response_code"] == "200" then
-                        update_last_cell_report();
-                    end;
-                    logger(10, "Result is ", tostring(result));
+                        local result, headers, payload = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, true);
+                        if result and headers["response_code"] == "200" then
+                            update_last_cell_report();
+                        end;
+                        logger(10, "Result is ", tostring(result));
+                    end
 
                     local nmea_data = nmea.getinfo(511);
                     if (nmea_data) then
