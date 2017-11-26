@@ -21,7 +21,7 @@ local function tohex(data)
         return ("%02x"):format(x:byte()) end)
     )
 end
-logger.create_logger("firmware", 0)
+logger.create_logger("firmware", 30)
 function get_firmware(imei, version)
     local fn_result = false
     --local open_net_result = tcp.open_network(client_id);
@@ -88,7 +88,7 @@ local check_firmware_and_maybe_update = function(imei, current_version)
         logger.log("firmware", 10, "Response is ", response)
 
         version = tonumber(response)
-        if( not version ) then
+        if( not version and response ~= "unknown") then
             logger.log("firmware", 30, "Invalid response. Expecting version number. Got: ", response)
         end
 
