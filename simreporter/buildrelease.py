@@ -11,15 +11,18 @@ config = ConfigParser.RawConfigParser()
 config.read('release.cfg')
 
 # module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9991", 115200, timeout=5)
+serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
 # module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
 
-VERSION = "201709141"
+VERSION = "201711261"
 files = config.get('release', 'files').split(",")
 
 
 def zip_files():
-    cmd = "~/git/zlib/contrib/minizip/minizip %s.zip %s" % (VERSION, " ".join(files))
+    zip_file_list = []
+    for file in files:
+        zip_file_list.append(file.replace(".lua", ".out"))
+    cmd = "~/git/zlib/contrib/minizip/minizip %s.zip %s" % (VERSION, " ".join(zip_file_list))
     print(cmd)
     result = os.system(cmd)
     print("Result is %s" % result)
