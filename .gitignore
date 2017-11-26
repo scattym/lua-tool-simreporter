@@ -2,3 +2,4 @@
 simreporter/*.pyc
 simreporter/lastupload/*
 .idea
+*.out
