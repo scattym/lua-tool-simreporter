@@ -26,12 +26,15 @@ function get_firmware(imei, version)
     local fn_result = false
     --local open_net_result = tcp.open_network(client_id);
     --logger.log("firmware", 10, "Open network response is: ", open_net_result);
-    local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), "/get_firmware?ident=imei:" .. imei, "");
+    collectgarbage()
+    local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("FIRMWARE_HOST"), config.get_config_value("UPDATE_PORT"), "/get_firmware?ident=imei:" .. imei, "");
+    collectgarbage()
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 30, "Callout for firmware failed. Result was: ", result, " and response code: ", headers["response_code"])
     else
         logger.log("firmware", 10, "Response length is ", #response)
         local firmware_json = json.decode(response);
+        collectgarbage()
         -- tcp.close_network(client_id);
         logger.log("firmware", 10, firmware_json);
         if not firmware_json then
@@ -44,10 +47,12 @@ function get_firmware(imei, version)
                 logger.log("firmware", 10, "File length: ", tostring(#firmware_json["file"]));
                 logger.log("firmware", 10, "Advertised checksum: ", tostring(firmware_json["checksum"]))
                 raw_data = base64.decode(firmware_json["file"])
+                collectgarbage()
                 hash = sha256.init()
                 hash:update(raw_data)
                 checksum = hash:final()
                 checksum_hex = tohex(checksum)
+                collectgarbage()
                 if( not string.equal(checksum_hex, firmware_json["checksum"]) ) then
                     logger.log("firmware", 30, "Checksums do not match. Calculated checksum is: ", checksum_hex, " but should be: ", firmware_json["checksum"])
                 else
@@ -75,7 +80,7 @@ end
 local check_firmware_and_maybe_update = function(imei, current_version)
     --local open_net_result = tcp.open_network(client_id);
     logger.log("firmware", 10, "Open network response is: ", open_net_result, "\r\n");
-    local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/get_firmware_version?ident=imei:" .. imei, "");
+    local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("FIRMWARE_HOST"), 65535, "/get_firmware_version?ident=imei:" .. imei, "");
     --tcp.close_network(client_id);
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 30, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
