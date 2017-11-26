@@ -43,7 +43,7 @@ CONFIG["CHECK_FOR_CHARGING"] = "true"
 CONFIG["MIN_BAT_PERCENT_FOR_BOOT"] = 12
 CONFIG["MIN_GPS_REPORT_TIME"] = 3600
 CONFIG["REPORT_DEVICE_INFO_WITH_GPS"] = "true"
-CONFIG["REPORT_CELL_WITH_GPS"] = "true"
+CONFIG["REPORT_CELL_WITH_GPS"] = "false"
 
 local client_id = 4
 logger.create_logger("config", 30)
