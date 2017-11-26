@@ -13,6 +13,7 @@ local unzip = require("unzip")
 local at = require("at_commands")
 local json = require("json")
 local logger = require("logging")
+local config = require("config")
 local client_id = 3
 
 local function tohex(data)
@@ -20,7 +21,7 @@ local function tohex(data)
         return ("%02x"):format(x:byte()) end)
     )
 end
-logger.create_logger("firmware", 30)
+logger.create_logger("firmware", 0)
 function get_firmware(imei, version)
     local fn_result = false
     --local open_net_result = tcp.open_network(client_id);
