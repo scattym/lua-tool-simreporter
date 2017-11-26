@@ -190,7 +190,7 @@ def delete_file(serial_port, filename):
 
 def ls(serial_port):
     serial_port.write('AT+FSLS\r\n')
-    get_response(serial_port)
+    return get_response(serial_port)
 
 
 def run_script(serial_port, script):
@@ -251,4 +251,9 @@ def reset(serial_port):
 
 def mkdir(serial_port, directory):
     serial_port.write('AT+FSMKDIR=%s\r\n' % directory)
+    response = get_response(serial_port)
+
+
+def rmdir(serial_port, directory):
+    serial_port.write('AT+FSRMDIR=%s\r\n' % directory)
     response = get_response(serial_port)
