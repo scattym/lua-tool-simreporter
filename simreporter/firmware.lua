@@ -20,23 +20,23 @@ local function tohex(data)
         return ("%02x"):format(x:byte()) end)
     )
 end
-logger.create_logger("firmware", 0)
+logger.create_logger("firmware", 30)
 function get_firmware(imei, version)
     local fn_result = false
     --local open_net_result = tcp.open_network(client_id);
     --logger.log("firmware", 10, "Open network response is: ", open_net_result);
     local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), "/get_firmware?ident=imei:" .. imei, "");
     if( not result or not string.equal(headers["response_code"], "200") ) then
-        logger.log("firmware", 10, "Callout for firmware failed. Result was: ", result, " and response code: ", headers["response_code"])
+        logger.log("firmware", 30, "Callout for firmware failed. Result was: ", result, " and response code: ", headers["response_code"])
     else
         logger.log("firmware", 10, "Response length is ", #response)
         local firmware_json = json.decode(response);
         -- tcp.close_network(client_id);
         logger.log("firmware", 10, firmware_json);
         if not firmware_json then
-            logger.log("firmware", 10, "Unable to load firmware json")
+            logger.log("firmware", 30, "Unable to load firmware json")
         elseif( is_version_quarantined(firmware_json["version"]) ) then
-            logger.log("firmware", 10, "Version ", firmware_json["version"], " is already quarantined, not expanding")
+            logger.log("firmware", 30, "Version ", firmware_json["version"], " is already quarantined, not expanding")
         else
             if( firmware_json["version"] and firmware_json["file"] and firmware_json["checksum"] ) then
                 logger.log("firmware", 10, firmware_json["version"]);
@@ -48,7 +48,7 @@ function get_firmware(imei, version)
                 checksum = hash:final()
                 checksum_hex = tohex(checksum)
                 if( not string.equal(checksum_hex, firmware_json["checksum"]) ) then
-                    logger.log("firmware", 10, "Checksums do not match. Calculated checksum is: ", checksum_hex, " but should be: ", firmware_json["checksum"])
+                    logger.log("firmware", 30, "Checksums do not match. Calculated checksum is: ", checksum_hex, " but should be: ", firmware_json["checksum"])
                 else
                     if( raw_data ) then
                         local zip_file_name = "c:/" .. firmware_json["version"] .. ".zip"
@@ -63,7 +63,7 @@ function get_firmware(imei, version)
                     end
                 end
             else
-                logger.log("firmware", 10, "One of the fields is missing. version: ", tostring(firmware_json["version"]), " file: ", tostring(#firmware_json["file"]), " checksum: ", tostring(firmware_json["checksum"]) )
+                logger.log("firmware", 30, "One of the fields is missing. version: ", tostring(firmware_json["version"]), " file: ", tostring(#firmware_json["file"]), " checksum: ", tostring(firmware_json["checksum"]) )
             end
         end
     end
@@ -77,13 +77,13 @@ local check_firmware_and_maybe_update = function(imei, current_version)
     local result, headers, response = tcp.http_open_send_close(client_id, "home.scattym.com", 65535, "/get_firmware_version?ident=imei:" .. imei, "");
     --tcp.close_network(client_id);
     if( not result or not string.equal(headers["response_code"], "200") ) then
-        logger.log("firmware", 10, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
+        logger.log("firmware", 30, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
     else
         logger.log("firmware", 10, "Response is ", response)
 
         version = tonumber(response)
         if( not version ) then
-            logger.log("firmware", 10, "Invalid response. Expecting version number. Got: ", response)
+            logger.log("firmware", 30, "Invalid response. Expecting version number. Got: ", response)
         end
 
         if( result and version and version > 0 ) then
@@ -92,21 +92,21 @@ local check_firmware_and_maybe_update = function(imei, current_version)
             else
                 logger.log("firmware", 10, "Need to update. Running version is: ", tostring(current_version), " and new version is: ", response)
                 if( is_version_quarantined(response) ) then
-                    logger.log("firmware", 10, "Version ", response, " is already quarantined, not downloading")
+                    logger.log("firmware", 30, "Version ", response, " is already quarantined, not downloading")
                 else
                     logger.log("firmware", 10, "Calling get_firmware")
                     local get_firmware_result = get_firmware(imei, response)
                     if( not get_firmware_result ) then
-                        logger.log("firmware", 10, "Firmware retrieval failed. Not restarting.")
+                        logger.log("firmware", 30, "Firmware retrieval failed. Not restarting.")
                     else
                         logger.log("firmware", 10, "New firmware retrieval was successful. Restarting script.")
                         thread.sleep(5000)
                         os.restartscript()
                         thread.sleep(60000)
-                        logger.log("firmware", 10, "Script restart failed. Restarting device")
+                        logger.log("firmware", 30, "Script restart failed. Restarting device")
                         at.reset()
                         thread.sleep(3600000)
-                        logger.log("firmware", 10, "ERROR: Device restart failed.")
+                        logger.log("firmware", 30, "ERROR: Device restart failed.")
                     end
                 end
             end

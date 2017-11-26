@@ -307,10 +307,6 @@ end;
 local function get_firmware_version()
     logger(10, "Trying to retrieve firmware version");
     logger(10, "imei: ", imei)
-    while(true) do
-        thread.sleep(10000)
-    end
-
     local client_id = 3;
     while (true) do
         firmware.check_firmware_and_maybe_update(imei, running_version)
