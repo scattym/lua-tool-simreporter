@@ -607,20 +607,24 @@ _M.open_send_close_tcp = open_send_close_tcp;
 local parse_http_headers = function(response)
     local headers = {}
     headers["response_code"] = "000"
-    for line in response:gmatch("([^\r\n]*)\r\n?") do
-        logger(0, "Line is ", line)
+    if not response then
+        logger(30, "Did not get a header string to parse. Response is nil.")
+    else
+        for line in response:gmatch("([^\r\n]*)\r\n?") do
+            logger(0, "Line is ", line)
 
-        local type, code, msg = line:match("([Hh][Tt][Tt][Pp]/[0-9].[0-9])%s+([0-9]*)%s+(.*)")
-        if( type and code and msg ) then
-            logger(0, "Type: ", type, " code: ", code, " msg: ", msg)
-            headers["response_code"] = code
-        else
-            for key, value in line:gmatch("(%S*):%s*(.*)") do
-                logger(0, "key is ", key, " value is ", value)
-                if( key and value ) then
-                    headers[key] = value
+            local type, code, msg = line:match("([Hh][Tt][Tt][Pp]/[0-9].[0-9])%s+([0-9]*)%s+(.*)")
+            if( type and code and msg ) then
+                logger(0, "Type: ", type, " code: ", code, " msg: ", msg)
+                headers["response_code"] = code
+            else
+                for key, value in line:gmatch("(%S*):%s*(.*)") do
+                    logger(0, "key is ", key, " value is ", value)
+                    if( key and value ) then
+                        headers[key] = value
+                    end
+
                 end
-
             end
         end
     end
