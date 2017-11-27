@@ -5,24 +5,19 @@ import time
 import os
 import os.path
 import argparse
+import tempfile
 import ConfigParser
+import shutil
+import datetime
 
 config = ConfigParser.RawConfigParser()
-config.read('release.cfg')
-
-# module = serial.Serial("/dev/cu.usbserial-A105NJ7M",  115200, timeout=5)
-serial_port = serial.serial_for_url("rfc2217://10.1.1.5:9990", 115200, timeout=5)
-# module = serial.Serial("/dev/ttyUSB0",  115200, timeout=5)
-
-VERSION = "201711263"
-files = config.get('release', 'files').split(",")
 
 
-def zip_files():
+def zip_files(zip_file):
     zip_file_list = []
-    for file in files:
-        zip_file_list.append(file.replace(".lua", ".out"))
-    cmd = "cd /tmp; minizip %s.zip %s; cd -;" % (VERSION, " ".join(zip_file_list))
+    for file_name in files:
+        zip_file_list.append(file_name.replace(".lua", ".out"))
+    cmd = "minizip %s.zip %s" % (zip_file, " ".join(zip_file_list))
     print(cmd)
     result = os.system(cmd)
     print("Result is %s" % result)
@@ -41,11 +36,18 @@ def file_is_newer_than(file1, file2):
 
 def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader, only_file):
     try:
+        serial_port = open_config_port()
+
         set_autorun(serial_port, False)
         if initial_reset:
             reset(serial_port)
             response = get_response(serial_port, 2)
-            while "START" not in response:
+            serial_port.close()
+            print("Sleeeping")
+            time.sleep(12)
+            print("Resuming")
+            serial_port.open()
+            while "PB DONE" not in response and "CME ERROR" not in response:
                 print("Waiting for module to start.")
                 response = get_response(serial_port, 2)
             time.sleep(13)
@@ -58,32 +60,53 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
         change_dir(serial_port, "libs")
         mkdir(serial_port, directory)
         change_dir(serial_port, directory)
+        os.mkdir("lastbuild")
+        compile_files = []
 
         for filename in files:  # os.listdir("."):
-            print("Filename is %s" %filename)
-            if "lua" in filename:
-                print "Putting file " + filename
-                with open(filename, 'r') as content_file:
-                    content = content_file.read()
-                    put_file(serial_port, "c:/libs/" + directory + "/" + filename, content)
+            if only_file is None or only_file == filename:
+                if os.path.isfile(filename):
+                    if "lua" in filename:
+                        if file_is_newer_than(
+                                filename, "lastbuild/" + filename) or force_all_files:
+                            print("Putting file %s" % filename)
+                            with open(filename, 'r') as content_file:
+                                content = content_file.read()
+                                put_file(
+                                    serial_port,
+                                    "c:/libs/" +
+                                    directory +
+                                    "/" +
+                                    filename,
+                                    content)
+                                # delete_file(module, file)
+                            touch("lastbuild/" + filename)
+                            compile_files.append(filename)
+                        else:
+                            print("File %s is not newer than last uploaded version" % (
+                                filename
+                            ))
                     # delete_file(module, file)
 
         # for file in files:  # os.listdir("."):
         #     compiled = file.replace(".lua", ".out")
         #     delete_file(module, compiled)
         time.sleep(2)
-        for filename in files:  # os.listdir("."):
+        for filename in compile_files:  # os.listdir("."):
             compile_file(serial_port, "c:/libs/" + directory + "/" + filename)
 
-        for filename in files:  # os.listdir("."):
+        for filename in compile_files:  # os.listdir("."):
             delete_file(serial_port, filename)
 
-        for filename in files:
+        os.mkdir("build")
+        os.chdir("build")
+        for filename in compile_files:
             built_file = filename.replace(".lua", ".out")
             data = get_file(serial_port, "c:/libs/%s/%s" % (directory, built_file))
-            f = open("/tmp/%s" % os.path.basename(built_file), 'w')
+            f = open("%s" % (os.path.basename(built_file)), 'w')
             f.write(data)
             f.close()
+        zip_files(full_file)
 
     finally:
         serial_port.close()
@@ -93,6 +116,12 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        '-c',
+        '--config-file',
+        help="The config file to use.",
+        default="builder.cfg",
     )
     parser.add_argument(
         '-f',
@@ -138,8 +167,25 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.zip_files:
-        zip_files()
-    else:
-        transfer_and_build_files(args.directory, not args.no_initial_reset, args.force_all_files, args.loader,
-                                 args.transfer_file)
+    config.read(args.config_file)
+
+    files = config.get('release', 'files').split(",")
+    date = datetime.datetime.utcnow()
+    date_str = date.strftime("%Y%m%d")
+    full_file = ""
+    for counter in range(0, 100):
+        counter_str = str(counter).zfill(2)
+        full_file = "%s%s%s" % (date_str, counter_str, ".zip")
+        if not os.path.isfile("build/%s" % full_file):
+            break
+    print("Full file is %s" % full_file)
+
+    transfer_and_build_files(
+        args.directory,
+        not args.no_initial_reset,
+        args.force_all_files,
+        args.loader,
+        args.transfer_file,
+    )
+
+

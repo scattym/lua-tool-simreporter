@@ -1,5 +1,8 @@
 *.pyc
 simreporter/*.pyc
 simreporter/lastupload/*
+simreporter/build/*
+simreporter/lastbuild/*
 .idea
 *.out
+builds
