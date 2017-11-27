@@ -17,7 +17,7 @@ def zip_files(zip_file):
     zip_file_list = []
     for file_name in files:
         zip_file_list.append(file_name.replace(".lua", ".out"))
-    cmd = "minizip %s.zip %s" % (zip_file, " ".join(zip_file_list))
+    cmd = "minizip %s %s" % (zip_file, " ".join(zip_file_list))
     print(cmd)
     result = os.system(cmd)
     print("Result is %s" % result)
@@ -60,7 +60,10 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
         change_dir(serial_port, "libs")
         mkdir(serial_port, directory)
         change_dir(serial_port, directory)
-        os.mkdir("lastbuild")
+        try:
+            os.mkdir("lastbuild")
+        except OSError as err:
+            print("Directory already present or can't create.")
         compile_files = []
 
         for filename in files:  # os.listdir("."):
@@ -98,7 +101,10 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
         for filename in compile_files:  # os.listdir("."):
             delete_file(serial_port, filename)
 
-        os.mkdir("build")
+        try:
+            os.mkdir("build")
+        except OSError as err:
+            print("Dir exists or can't create.")
         os.chdir("build")
         for filename in compile_files:
             built_file = filename.replace(".lua", ".out")
