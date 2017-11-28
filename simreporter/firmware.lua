@@ -149,7 +149,7 @@ local check_firmware_and_maybe_reset = function(imei, current_version)
                 if( is_version_quarantined(response) ) then
                     logger.log("firmware", 30, "Version ", response, " is already quarantined, not downloading")
                 else
-                    logger.log("firmware", 10, "New firmware ready to go. Restarting script to download.")
+                    logger.log("firmware", 30, "New firmware ready to go. Restarting script to download.")
                     thread.sleep(5000)
                     os.restartscript()
                     thread.sleep(60000)
