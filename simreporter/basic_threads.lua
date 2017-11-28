@@ -309,8 +309,10 @@ local function get_firmware_version()
     logger(10, "imei: ", imei)
     local client_id = 3;
     while (true) do
-        firmware.check_firmware_and_maybe_update(imei, running_version)
-        collectgarbage()
+        if config.get_config_value("CHECK_FOR_FIRMWARE_IN_THREADS") == "true" then
+            firmware.check_firmware_and_maybe_reset(imei, running_version)
+            collectgarbage()
+        end
         thread.sleep(config.get_config_value("FIRMWARE_SLEEP_TIME"));
     end
 end
@@ -423,13 +425,16 @@ local start_threads = function (version)
 
     network_setup.set_network_from_sms_operator();
     vmsleep(2000);
-    firmware.check_firmware_and_maybe_update(imei, running_version)
+    local config_result = config.load_config_from_server(imei, running_version)
+    if config.get_config_value("CHECK_FOR_FIRMWARE_ON_BOOT") == "true" then
+        firmware.check_firmware_and_maybe_update(imei, running_version)
+    end
 
     logger(10, "Start of start_threads")
+    local config_update_thread = thread.create(get_config)
     local gps_tick_thread = thread.create(gps_tick)
     local cell_tick_thread = thread.create(cell_tick)
     local firmware_check_thread = thread.create(get_firmware_version)
-    local config_update_thread = thread.create(get_config)
     local out_cmd_thread = thread.create(process_out_cmd)
     local test_thread = thread.create(testing_thread)
     local charging_check_thread = thread.create(charging_check)
@@ -443,14 +448,14 @@ local start_threads = function (version)
     local result
     -- thread.sleep(1000);
     logger(10, "Starting threads");
+    result = thread.run(config_update_thread);
+    logger(10, "Config update start thread result is ", tostring(result));
     result = thread.run(gps_tick_thread);
     logger(10, "GPS start thread result is ", tostring(result));
     result = thread.run(cell_tick_thread);
     logger(10, "Cell data start thread result is ", tostring(result));
     result = thread.run(firmware_check_thread);
     logger(10, "Firmware check start thread result is ", tostring(result));
-    result = thread.run(config_update_thread);
-    logger(10, "Config update start thread result is ", tostring(result));
     result = thread.run(out_cmd_thread);
     logger(10, "Command parser start thread result is ", tostring(result));
     result = thread.run(test_thread);
