@@ -442,11 +442,11 @@ local start_threads = function (version)
         end;
 
         collectgarbage();
-        if should_reboot() then
-            logger(30, "Reached inactivity timer. Rebooting.")
-            thread.sleep(10000)
-            at.reset()
-        end
+--        if should_reboot() then
+--            logger(30, "Reached inactivity timer. Rebooting.")
+--            thread.sleep(10000)
+--            at.reset()
+--        end
         logger(30, "Main thread sleeping. Max mem: ", system.get_peak_memory())
         thread.sleep(config.get_config_value("MAIN_THREAD_SLEEP"));
     end;
