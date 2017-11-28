@@ -35,7 +35,7 @@ def file_is_newer_than(file1, file2):
 
 
 def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader, only_file):
-    serial_port = open_config_port()
+    serial_port = open_config_port(config_file="builder.cfg")
 
     try:
 
