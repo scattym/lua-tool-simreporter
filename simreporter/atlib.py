@@ -4,9 +4,9 @@ import os
 import ConfigParser
 
 
-def open_config_port(speed=115200, config_file='release.cfg'):
+def open_config_port(speed=115200):
     config = ConfigParser.RawConfigParser()
-    config.read(config_file)
+    config.read('release.cfg')
     device = config.get('release', 'device')
     try:
         serial_port = serial.serial_for_url(device, speed, timeout=5)
@@ -251,4 +251,9 @@ def reset(serial_port):
 
 def mkdir(serial_port, directory):
     serial_port.write('AT+FSMKDIR=%s\r\n' % directory)
+    response = get_response(serial_port)
+
+
+def rmdir(serial_port, directory):
+    serial_port.write('AT+FSRMDIR=%s\r\n' % directory)
     response = get_response(serial_port)
