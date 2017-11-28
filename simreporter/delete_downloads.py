@@ -18,7 +18,7 @@ try:
     change_dir(serial_port, "libs")
     files = ls(serial_port)
     for file in files.replace('\r', '').split("\n"):
-        if file not in ["base", "AT+FSLS", ""] and "SUBDIRECT" not in file:
+        if file not in ["base", "AT+FSLS", "", "OK"] and "SUBDIRECT" not in file:
             change_dir(serial_port, file)
             delete_file(serial_port, "*.*")
             change_dir(serial_port, "..")
