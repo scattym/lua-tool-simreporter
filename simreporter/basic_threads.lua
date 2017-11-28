@@ -36,9 +36,9 @@ local function tohex(data)
 end
 
 local function update_last_gps_report()
-    thread.enter_cs(2);
+    thread.enter_cs(7);
     last_gps_report = os.clock();
-    thread.leave_cs(2);
+    thread.leave_cs(7);
 end;
 
 local function update_last_cell_report()
@@ -48,9 +48,9 @@ local function update_last_cell_report()
 end;
 
 local function last_gps_report_has_expired()
-    thread.enter_cs(2);
+    thread.enter_cs(7);
     local copy_of_last_gps_report = last_gps_report;
-    thread.leave_cs(2);
+    thread.leave_cs(7);
     local now = os.clock();
     local time_since_last_report = now - copy_of_last_gps_report;
     logger(10, "Now is: ", tostring(now), " last reported time is: ", tostring(copy_of_last_gps_report), " difference is: ", tostring(time_since_last_report));
@@ -442,12 +442,12 @@ local start_threads = function (version)
         end;
 
         collectgarbage();
---        if should_reboot() then
---            logger(30, "Reached inactivity timer. Rebooting.")
---            thread.sleep(10000)
---            at.reset()
---        end
-        logger(30, "Main thread sleeping. Max mem: ", system.get_peak_memory())
+        if should_reboot() then
+            logger(30, "Reached inactivity timer. Rebooting.")
+            thread.sleep(10000)
+            at.reset()
+        end
+        logger(30, "Main thread sleeping. Max mem: ", tostring(getpeakmem()))
         thread.sleep(config.get_config_value("MAIN_THREAD_SLEEP"));
     end;
     logger(30, "One of the threads is not running or reached max loop count.");
