@@ -18,7 +18,7 @@ local out_command = require("out_command")
 local mqtt_thread = require("mqtt_thread")
 local socket_thread = require("socket_thread")
 
-local logger = logging.create("basic_threads", 0)
+local logger = logging.create("basic_threads", 30)
 
 local ati_string = at.get_device_info();
 local last_cell_report = 0;
