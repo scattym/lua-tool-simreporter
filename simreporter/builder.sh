@@ -8,7 +8,7 @@ while true; do
         if [ $? -eq 0 ] ; then
             docker exec --user=root nmeaproxy bash -c 'rm /tmp/firmware/*.zip'
             image=`ls -rt build/*.zip | tail -1`
-            docker cp ${image} nmeaproxy:/tmp/firmware
+            docker cp build/${image} nmeaproxy:/tmp/firmware
         fi
     fi
     echo "`date`: Sleeping for 60 seconds"
