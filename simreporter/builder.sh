@@ -9,6 +9,7 @@ while true; do
             docker exec --user=root nmeaproxy bash -c 'rm /tmp/firmware/*.zip'
             image=`ls -rt build/*.zip | tail -1`
             docker cp build/${image} nmeaproxy:/tmp/firmware
+            echo "Build successful and image uploaded."
         fi
     fi
     echo "`date`: Sleeping for 60 seconds"
