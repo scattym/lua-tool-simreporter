@@ -89,11 +89,7 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
                             print("File %s is not newer than last uploaded version" % (
                                 filename
                             ))
-                    # delete_file(module, file)
 
-        # for file in files:  # os.listdir("."):
-        #     compiled = file.replace(".lua", ".out")
-        #     delete_file(module, compiled)
         time.sleep(2)
         for filename in compile_files:  # os.listdir("."):
             compile_file(serial_port, "c:/libs/" + directory + "/" + filename)
