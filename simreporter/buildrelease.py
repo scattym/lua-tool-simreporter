@@ -63,7 +63,7 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
         try:
             os.mkdir("lastbuild")
         except OSError as err:
-            print("Directory already present or can't create.")
+            print("Directory already present or can't create. %s" % err)
         compile_files = []
 
         for filename in files:  # os.listdir("."):
