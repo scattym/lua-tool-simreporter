@@ -112,7 +112,11 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
             f = open("%s" % (os.path.basename(built_file)), 'w')
             f.write(data)
             f.close()
-        zip_files(full_file)
+
+        if len(compile_files) == 0:
+            print("Nothing changed in this build")
+        else:
+            zip_files(full_file)
 
     finally:
         serial_port.close()
