@@ -122,7 +122,46 @@ local check_firmware_and_maybe_update = function(imei, current_version)
     end
     collectgarbage();
 end
-
 _M.check_firmware_and_maybe_update = check_firmware_and_maybe_update
+
+
+local check_firmware_and_maybe_reset = function(imei, current_version)
+    --local open_net_result = tcp.open_network(client_id);
+    logger.log("firmware", 10, "Open network response is: ", open_net_result, "\r\n");
+    local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("FIRMWARE_HOST"), 65535, "/get_firmware_version?ident=imei:" .. imei, "");
+    --tcp.close_network(client_id);
+    if( not result or not string.equal(headers["response_code"], "200") ) then
+        logger.log("firmware", 30, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
+    else
+        logger.log("firmware", 10, "Response is ", response)
+
+        version = tonumber(response)
+        if( not version and response ~= "unknown") then
+            logger.log("firmware", 30, "Invalid response. Expecting version number. Got: ", response)
+        end
+
+        if( result and version and version > 0 ) then
+            if( string.equal(current_version, response) ) then
+                logger.log("firmware", 10, "The running version and new versions are the same: ", current_version)
+            else
+                logger.log("firmware", 10, "Need to update. Running version is: ", tostring(current_version), " and new version is: ", response)
+                if( is_version_quarantined(response) ) then
+                    logger.log("firmware", 30, "Version ", response, " is already quarantined, not downloading")
+                else
+                    logger.log("firmware", 10, "New firmware ready to go. Restarting script to download.")
+                    thread.sleep(5000)
+                    os.restartscript()
+                    thread.sleep(60000)
+                    logger.log("firmware", 30, "Script restart failed. Restarting device")
+                    at.reset()
+                    thread.sleep(3600000)
+                    logger.log("firmware", 30, "ERROR: Device restart failed.")
+                end
+            end
+        end
+    end
+    collectgarbage();
+end
+_M.check_firmware_and_maybe_reset = check_firmware_and_maybe_reset
 
 return _M
