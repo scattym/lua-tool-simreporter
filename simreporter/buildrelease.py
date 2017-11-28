@@ -34,12 +34,10 @@ def file_is_newer_than(file1, file2):
     return True
 
 
-def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader, only_file):
-    serial_port = open_config_port(config_file="builder.cfg")
+def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader, only_file, config_file):
+    serial_port = open_config_port(config_file=config_file)
 
     try:
-
-
         set_autorun(serial_port, False)
         if initial_reset:
             reset(serial_port)
@@ -199,6 +197,7 @@ if __name__ == '__main__':
         args.force_all_files,
         args.loader,
         args.transfer_file,
+        args.config_file,
     )
 
 
