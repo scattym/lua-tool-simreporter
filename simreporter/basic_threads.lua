@@ -275,6 +275,7 @@ local function cell_tick()
             for i=1,1 do
                 local cell_table = device.get_device_info_table()
                 cell_table["extra_info"] = EXTRA_INFO
+                cell_table["running_version"] = tostring(running_version)
                 --cell_table["key"] = rsa.num_to_hex(key)
                 local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, config.get_config_value("NMEA_LOOP_COUNT"));
                 local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, key_data)
