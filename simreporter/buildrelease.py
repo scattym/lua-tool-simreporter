@@ -83,7 +83,7 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
                                     filename,
                                     content)
                                 # delete_file(module, file)
-                            touch("lastbuild/" + filename)
+
                             compile_files.append(filename)
                         else:
                             print("File %s is not newer than last uploaded version" % (
@@ -112,6 +112,7 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
             f = open("%s" % (os.path.basename(built_file)), 'w')
             f.write(data)
             f.close()
+            touch("lastbuild/" + filename)
 
         if len(compile_files) == 0:
             print("Nothing changed in this build")
