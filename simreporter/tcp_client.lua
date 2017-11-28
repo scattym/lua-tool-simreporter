@@ -10,7 +10,7 @@ local _M = {}
 
 local CLIENT_TO_APP_HANDLE = {}
 -- logger.create_logger("tcp_client", 30)
-local logger = logging.create("basic_threads", 30)
+local logger = logging.create("tcp_client", 30)
 
 local CLOSE_NETWORK_AFTER_TRANSFER = true
 
@@ -422,7 +422,6 @@ local send = function(sockfd, data)
     return true
 end
 
-
 --[[
 error code definition
 SOCK_RST_SOCK_FAILED and SOCK_RST_NETWORK_FAILED are fatal errors,
@@ -527,7 +526,8 @@ local send_data = function(client_id, host, port, ...)
                 logger(0, "socket.recv()...");
                 local timeout = 15000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
 
-                while( err_code ~= SOCK_CLOSE_EVENT ) do
+                while( err_code == 0 ) do -- ~= SOCK_CLOSE_EVENT ) do
+                    logger(0, "Error code is ", err_code)
                     local fragment = ""
                     err_code, fragment = socket.recv(socket_fd, timeout);
                     logger(0, "socket.recv(), err_code=", err_code);
@@ -722,6 +722,4 @@ end;
 
 _M.http_open_send_close = http_open_send_close;
 
-
 return _M
-
