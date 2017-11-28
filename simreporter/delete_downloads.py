@@ -10,8 +10,9 @@ config.read('release.cfg')
 VERSION = "201709141"
 files = config.get('release', 'files').split(",")
 
+serial_port = open_config_port()
 try:
-    serial_port = open_config_port()
+
 
     change_dir(serial_port, "c:/")
     change_dir(serial_port, "libs")

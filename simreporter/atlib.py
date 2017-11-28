@@ -190,7 +190,7 @@ def delete_file(serial_port, filename):
 
 def ls(serial_port):
     serial_port.write('AT+FSLS\r\n')
-    get_response(serial_port)
+    return get_response(serial_port)
 
 
 def run_script(serial_port, script):

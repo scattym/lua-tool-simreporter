@@ -423,6 +423,7 @@ local start_threads = function (version)
 
     network_setup.set_network_from_sms_operator();
     vmsleep(2000);
+    firmware.check_firmware_and_maybe_update(imei, running_version)
 
     logger(10, "Start of start_threads")
     local gps_tick_thread = thread.create(gps_tick)
