@@ -18,7 +18,7 @@ local out_command = require("out_command")
 local mqtt_thread = require("mqtt_thread")
 local socket_thread = require("socket_thread")
 
-local logger = logging.create("basic_threads", 30)
+local logger = logging.create("basic_threads", 0)
 
 local ati_string = at.get_device_info();
 local last_cell_report = 0;
@@ -78,6 +78,24 @@ local function last_cell_report_has_expired()
         return true;
     else
         logger(10, "Returning false");
+        return false;
+    end;
+
+end;
+
+local function should_reboot()
+    thread.enter_cs(2)
+    local copy_of_last_cell_report = last_cell_report
+    thread.leave_cs(2)
+    local now = os.clock();
+    local time_since_last_report = now - copy_of_last_cell_report
+    logger(10, "should_reboot(): Now is: ", tostring(now), " last reported time is: ", tostring(copy_of_last_cell_report), " difference is: ", tostring(time_since_last_report));
+    logger(10, "should_reboot(): Difference is: ", tostring(time_since_last_report), ", min report time is: ", tostring(config.get_config_value("INACTIVITY_REBOOT_TIME")));
+    if copy_of_last_cell_report == 0 or time_since_last_report > config.get_config_value("INACTIVITY_REBOOT_TIME") then
+        logger(10, "should_reboot(): Returning true");
+        return true;
+    else
+        logger(10, "should_reboot(): Returning false");
         return false;
     end;
 
@@ -254,15 +272,6 @@ local function cell_tick()
     local client_id = 2;
     logger(30, "Enc start, clock is: ", tostring(os.clock()))
 
-    --[[key, enc_key = keygen.create_and_encrypt_key(128)
-    logger(30, "Key is: ", key);
-    logger(30, "Encrypted key is: ", enc_key);
-    logger(30, "Key is: ", rsa.num_to_hex(key));
-    logger(30, "Encrypted key is: ", rsa.num_to_hex(enc_key))
-    logger(30, "Clock is: ", tostring(os.clock()))
-    local key_data = {}
-    key_data["key"] = key
-    key_data["enc_key"] = enc_key]]--
     local key_data = true
     local failure_count = 0
 
@@ -351,59 +360,7 @@ end
 local function testing_thread()
 
     socket_thread.socket_thread(8, "home.scattym.com", 65534)
-    --mqtt_thread.mqtt_thread()
-    --[[
-    while ( true ) do
-        local cell_table = device.get_device_info_table()
-        local nmea_data = nmea.getinfo(511);
-        local data = '{"version":"1","packet_number":4,"nmea":"$GPGSV,4,1,16,28,65,202,34,07,40,077,27,17,43,348,27,13,36,230,27*7B|$GPGSV,4,2,16,15,07,219,16,05,02,282,16,08,09,140,16,11,28,104,15*76|$GPGSV,4,3,16,19,23,341,15,30,68,118,14,01,16,084,,09,07,015,*72|$GPGSV,4,4,16,04,,,,32,,,,31,,,,29,,,*72|$GPGGA,031924.0,3348.948974,S,15112.009167,E,1,06,1.2,84.5,M,0,M,,*52|$GPVTG,NaN,T,,M,0.0,N,0.0,K,A*42|$GPRMC,031924.0,A,3348.948974,S,15112.009167,E,0.0,0.0,141017,,,A*70|$GPGSA,A,3,07,11,13,17,19,28,,,,,,,3.1,1.2,2.9*39|","device_info":"|Manufacturer: SIMCOM INCORPORATED|Model: SIMCOM_SIM5320A|Revision: SIM5320A_V1.5|IMEI: 012813008945935|+GCAP: +CGSM,+DS,+ES||OK|","packet_count":0}'
-        if (nmea_data) then
-            local encrypted = aes.encrypt("password", data, aes.AES128, aes.CBCMODE)
-            local decrypted = aes.decrypt("password", encrypted, aes.AES128, aes.CBCMODE)
-            if data ~= decrypted then
-                logger(30, "Decryption failed")
-                logger(30, data)
-                logger(30, decrypted)
-            end
-            collectgarbage()
 
-        end;
-
-        thread.sleep(2000)]]
-
-        --[[for j=1,127 do
-            for i=1,63 do
-                logger(30, "setting for device: ", j, " and register: ", i)
-                i2c.write_i2c_dev(j, i, 101, 1)
-                thread.sleep(100)
-                local a, b, c, d = i2c.read_i2c_dev(j, i, 4)
-                logger(30, "Read: ", a, " ", b, " ", c, " ", d)
-                thread.sleep(100)
-            end
-        end]]--
-
-        --[[spi.set_clk(0, 1, 1);
-        logger(30, "set_cs")
-        spi.set_cs(1, 1);
-        logger(30, "set_freq")
-        spi.set_freq(1000, 500000, 1000);
-        logger(30, "set_num_bits")
-        spi.set_num_bits(8, 0, 0);
-        logger(30, "config_device")
-        spi.config_device();
-        spi.write(141, 42, 1)
-        while true do
-            for i=1,100 do
-                spi.write(65, i, 1)
-                a, b, c, d = spi.read(i, 1)
-                logger(30, "a:", tostring(a), ",b:", tostring(b), ",c:", tostring(c), ",d:", tostring(d))
-                thread.sleep(100)
-            end
-            spi.write(10, 101, 1)
-
-            thread.sleep(1000)
-        end]]--
-    --end
 end
 
 local function get_battery_percent()
@@ -484,24 +441,13 @@ local start_threads = function (version)
             break;
         end;
 
-
-        --[[local hosts = {6, 7, 16, 17 }
-        --local hosts = {6, 7}
-        for _,i in ipairs(hosts) do
-        --for i=1,127 do
-            for j=1,32 do
-                local data = i2c.read_i2c_dev(i, j, 4)
-                local hex = ""
-                if data ~= false then
-                    hex = string.format("%x", data)
-                end
-                logger(30, "", i, ":", data, ":", hex)
-                thread.sleep(200)
-            end
-        end]]--
-
         collectgarbage();
-        logger(30, "Main thread sleeping")
+        if should_reboot() then
+            logger(30, "Reached inactivity timer. Rebooting.")
+            thread.sleep(10000)
+            at.reset()
+        end
+        logger(30, "Main thread sleeping. Max mem: ", system.get_peak_memory())
         thread.sleep(config.get_config_value("MAIN_THREAD_SLEEP"));
     end;
     logger(30, "One of the threads is not running or reached max loop count.");
