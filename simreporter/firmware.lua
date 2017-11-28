@@ -124,6 +124,3 @@ end
 _M.check_firmware_and_maybe_update = check_firmware_and_maybe_update
 
 return _M
-
-
-
