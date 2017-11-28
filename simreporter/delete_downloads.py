@@ -12,8 +12,6 @@ files = config.get('release', 'files').split(",")
 
 serial_port = open_config_port()
 try:
-
-
     change_dir(serial_port, "c:/")
     change_dir(serial_port, "libs")
     files = ls(serial_port)
