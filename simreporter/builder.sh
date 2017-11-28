@@ -7,7 +7,7 @@ while true; do
         ./buildrelease.py -n
         if [ $? -eq 0 ] ; then
             docker exec --user=root nmeaproxy bash -c 'rm /tmp/firmware/*.zip'
-            image=`ls -rt build | tail -1`
+            image=`ls -rt build/*.zip | tail -1`
             docker cp ${image} nmeaproxy:/tmp/firmware
         fi
     fi
