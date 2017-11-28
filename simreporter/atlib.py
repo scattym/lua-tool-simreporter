@@ -4,9 +4,9 @@ import os
 import ConfigParser
 
 
-def open_config_port(speed=115200):
+def open_config_port(speed=115200, config_file='release.cfg'):
     config = ConfigParser.RawConfigParser()
-    config.read('release.cfg')
+    config.read(config_file)
     device = config.get('release', 'device')
     try:
         serial_port = serial.serial_for_url(device, speed, timeout=5)
