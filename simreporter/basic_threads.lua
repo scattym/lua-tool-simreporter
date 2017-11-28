@@ -91,7 +91,7 @@ local function should_reboot()
     local time_since_last_report = now - copy_of_last_cell_report
     logger(10, "should_reboot(): Now is: ", tostring(now), " last reported time is: ", tostring(copy_of_last_cell_report), " difference is: ", tostring(time_since_last_report));
     logger(10, "should_reboot(): Difference is: ", tostring(time_since_last_report), ", min report time is: ", tostring(config.get_config_value("INACTIVITY_REBOOT_TIME")));
-    if copy_of_last_cell_report == 0 or time_since_last_report > config.get_config_value("INACTIVITY_REBOOT_TIME") then
+    if time_since_last_report > config.get_config_value("INACTIVITY_REBOOT_TIME") then
         logger(10, "should_reboot(): Returning true");
         return true;
     else
