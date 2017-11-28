@@ -104,6 +104,7 @@ local check_firmware_and_maybe_update = function(imei, current_version)
                 else
                     logger.log("firmware", 10, "Calling get_firmware")
                     local get_firmware_result = get_firmware(imei, response)
+                    collectgarbage()
                     if( not get_firmware_result ) then
                         logger.log("firmware", 30, "Firmware retrieval failed. Not restarting.")
                     else
