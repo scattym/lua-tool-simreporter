@@ -9,7 +9,7 @@ while true; do
             docker exec --user=root nmeaproxy bash -c 'rm /tmp/firmware/*.zip'
             image=`ls -rt build/*.zip | tail -1`
             echo "`date`: Image is ${image}"
-            docker cp build/${image} nmeaproxy:/tmp/firmware
+            docker cp ${image} nmeaproxy:/tmp/firmware
             if [ $? -eq 0 ] ; then
                 echo "`date`: Build successful and image uploaded."
             fi
