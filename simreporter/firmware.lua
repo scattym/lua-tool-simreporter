@@ -21,7 +21,9 @@ local function tohex(data)
         return ("%02x"):format(x:byte()) end)
     )
 end
+
 logger.create_logger("firmware", 30)
+
 function get_firmware(imei, version)
     local fn_result = false
     --local open_net_result = tcp.open_network(client_id);
