@@ -10,6 +10,7 @@ local config = require("config")
 local tcp = require("tcp_client")
 local logging = require("logging")
 local util = require("util")
+local json = require("json")
 local logger = logging.create("socket_thread", 0)
 
 local _M = {}
