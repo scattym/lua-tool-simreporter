@@ -11,7 +11,7 @@ local tcp = require("tcp_client")
 local logging = require("logging")
 local util = require("util")
 local json = require("json")
-local logger = logging.create("socket_thread", 0)
+local logger = logging.create("socket_thread", 30)
 
 local _M = {}
 
@@ -35,7 +35,7 @@ local check_hmac_and_return_json = function(json_str)
         logger(0, "Passed hmac test, returning table")
         return config_table
     end
-    logger(0, "Failed hmac test, returning nil")
+    logger(30, "Failed hmac test, returning nil")
     return nil
 end
 
