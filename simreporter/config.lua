@@ -129,6 +129,7 @@ local calc_checksum = function(config_table)
     collectgarbage()
     return checksum_hex
 end
+_M.calc_checksum = calc_checksum
 
 local update_config_checksum = function()
     thread.enter_cs(4);

@@ -9,7 +9,8 @@
 local config = require("config")
 local tcp = require("tcp_client")
 local logging = require("logging")
-local logger = logging.create("socket_thread", 30)
+local util = require("util")
+local logger = logging.create("socket_thread", 0)
 
 local _M = {}
 
@@ -21,6 +22,21 @@ local send_data = function(client_id, data)
     end
 end
 _M.send_data = send_data
+
+local check_hmac_and_return_json = function(json_str)
+    logger.log("config", 0, "Setting config from json")
+    local config_table = json.decode(json_str)
+    if not config_table then
+        logger(30, "Unable to load json from string")
+        return nil
+    end
+    if config.check_hmac_config(config_table) then
+        logger(0, "Passed hmac test, returning table")
+        return config_table
+    end
+    logger(0, "Failed hmac test, returning nil")
+    return nil
+end
 
 local socket_thread = function(client_id, imei)
     while true do
@@ -64,15 +80,19 @@ local socket_thread = function(client_id, imei)
                         connected = false
                     else
                         if( data ~= nil ) then
-                            local return_string = at.run_command(string.gsub(data, "[\r\n]", ""))
-                            if return_string ~= nil then
-                                local err_code, bytes = socket.send(socket_fd, return_string)
+                            local json_object = check_hmac_and_return_json(data)
+                            if json_object and json_object["command"] then
+                                local return_string = at.run_command(json_object["command"])
+                                -- local return_string = at.run_command(string.gsub(data, "[\r\n]", ""))
+                                if return_string ~= nil then
+                                    local err_code, bytes = socket.send(socket_fd, return_string)
 
-                                if (err_code and (err_code == tcp.SOCK_RST_OK)) then
-                                    logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
-                                else
-                                    logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
-                                    connected = false
+                                    if (err_code and (err_code == tcp.SOCK_RST_OK)) then
+                                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                                    else
+                                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                                        connected = false
+                                    end
                                 end
                             end
                         end

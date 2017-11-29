@@ -460,6 +460,7 @@ local start_threads = function (version)
     logger(30, "Config update thread running: ", thread.running(config_update_thread));
     logger(30, "Command parser thread running: ", thread.running(out_cmd_thread));
     logger(30, "Charging check thread running: ", thread.running(charging_check_thread));
+    logger(30, "Socket thread running: ", thread.running(test_thread));
     logger(30, "Loop counter: ", counter);
     thread.sleep(2000)
     at.reset()
