@@ -95,6 +95,8 @@ local socket_thread = function(client_id, imei)
                                         connected = false
                                     end
                                 end
+                            else
+                                logger(30, "Command did not pass validation.")
                             end
                         end
                     end

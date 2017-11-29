@@ -217,6 +217,7 @@ local check_hmac_config = function(config_table)
     logger.log("config", 0, "Checksum check failed")
     return false
 end
+_M.check_hmac_config = check_hmac_config
 
 local set_config_from_json = function(json_str)
     logger.log("config", 0, "Setting config from json")
