@@ -32,14 +32,14 @@ local socket_thread = function(client_id, imei)
                 connected = true
                 CLIENT_TO_SOCKET[client_id] = socket_fd
                 local connect_string = "C0NXN:" .. imei .. "\n"
-                local err_code, bytes = socket_fd.send(socket_fd, connect_string)
+                local err_code, bytes = socket.send(socket_fd, connect_string)
 
                 if (err_code and (err_code == tcp.SOCK_RST_OK)) then
                     logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
                 else
                     logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
                     connected = false
-                    socket_fd.close(socket_fd)
+                    socket.close(socket_fd)
                     CLIENT_TO_SOCKET[client_id] = -1
                     tcp.close_network(client_id)
                 end
