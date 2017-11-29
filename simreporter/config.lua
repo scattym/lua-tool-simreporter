@@ -47,6 +47,7 @@ CONFIG["REPORT_CELL_WITH_GPS"] = "false"
 CONFIG["CHECK_FOR_FIRMWARE_ON_BOOT"] = "true"
 CONFIG["CHECK_FOR_FIRMWARE_IN_THREADS"] = "true"
 CONFIG["INACTIVITY_REBOOT_TIME"] = 3600
+CONFIG["SHOULD_REBOOT"] = "false"
 
 local client_id = 4
 logger.create_logger("config", 30)
@@ -94,6 +95,7 @@ local MUST_BE_STRING = {
     "REPORT_DEVICE_INFO_WITH_GPS",
     "ENABLE_TCP",
     "CHECK_FOR_CHARGING",
+    "SHOULD_REBOOT",
 }
 
 local MUST_BE_BOOLEAN = {

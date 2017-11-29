@@ -84,6 +84,9 @@ local function last_cell_report_has_expired()
 end;
 
 local function should_reboot()
+    if config.get_config_value("SHOULD_REBOOT") == "true" then
+        return true
+    end
     thread.enter_cs(2)
     local copy_of_last_cell_report = last_cell_report
     thread.leave_cs(2)
@@ -359,7 +362,7 @@ end
 
 local function testing_thread()
 
-    socket_thread.socket_thread(8, "home.scattym.com", 65534)
+    socket_thread.socket_thread(8, imei)
 
 end
 
