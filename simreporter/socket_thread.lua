@@ -25,7 +25,7 @@ end
 _M.send_data = send_data
 
 local check_hmac_and_return_json = function(json_str)
-    logger.log("config", 0, "Setting config from json")
+    logger(0, "Checking command json")
     local config_table = json.decode(json_str)
     if not config_table then
         logger(30, "Unable to load json from string")
