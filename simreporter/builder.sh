@@ -12,6 +12,9 @@ while true; do
             docker cp ${image} nmeaproxy:/tmp/firmware
             if [ $? -eq 0 ] ; then
                 echo "`date`: Build successful and image uploaded."
+                tag_name=`echo ${image} | sed 's/.zip//g'`
+                git tag ${tag_name}
+                git push --tags
             fi
         fi
     fi
