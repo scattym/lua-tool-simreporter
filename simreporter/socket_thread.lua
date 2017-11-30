@@ -66,7 +66,7 @@ local socket_thread = function(client_id, imei)
             end
             while(connected) do
                 logger(0, "Waiting for a read event on socket ", socket_fd, "\r\n")
-                local data_available, closed = tcp.wait_read_event(socket_fd, 10000)
+                local data_available, closed = tcp.wait_read_event(socket_fd, config.get_config_value("SOCK_HEARTBEAT_INTERVAL"))
                 logger(0, "Read event has returned for socket ", socket_fd, "\r\n")
 
                 if data_available then
