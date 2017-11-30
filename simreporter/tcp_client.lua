@@ -399,7 +399,7 @@ local wait_read_event = function(sockfd, timeout)
             local event_mask = evt_p3;
             if ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_CLOSE_EVENT) ~= 0)) then
                 --socket closed by remote side
-                logger(0, "Socket closed by remote side\r\n")
+                logger(30, "Socket closed by remote side\r\n")
                 logger(0, "waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
                 return true, true;
             elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_READ_EVENT) ~= 0)) then
