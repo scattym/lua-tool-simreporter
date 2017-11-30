@@ -40,6 +40,7 @@ local check_hmac_and_return_json = function(json_str)
 end
 
 local socket_thread = function(client_id, imei)
+    local connect_string = "C0NXN:" .. imei .. "\n"
     while true do
         if config.get_config_value("ENABLE_TCP") == "true" then
             local connected = false
@@ -48,7 +49,7 @@ local socket_thread = function(client_id, imei)
                 logger(0, "Connected to host: ", config.get_config_value("SOCK_HOST"), " on port: ", config.get_config_value("SOCK_PORT"), " with client id: ", client_id)
                 connected = true
                 CLIENT_TO_SOCKET[client_id] = socket_fd
-                local connect_string = "C0NXN:" .. imei .. "\n"
+
                 local err_code, bytes = socket.send(socket_fd, connect_string)
 
                 if (err_code and (err_code == tcp.SOCK_RST_OK)) then
@@ -101,7 +102,7 @@ local socket_thread = function(client_id, imei)
                         end
                     end
                 else
-                    local err_code, bytes = socket.send(socket_fd, "C0NXN\n")
+                    local err_code, bytes = socket.send(socket_fd, "C0NXN>")
                     if (err_code and (err_code == tcp.SOCK_RST_OK)) then
                         logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
                     else
