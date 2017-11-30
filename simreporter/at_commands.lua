@@ -206,4 +206,11 @@ local reset = function()
 end;
 _M.reset = reset
 
+-- AT+CMGF=1
+local set_cmgf = function(value)
+    local response = run_command("AT+CMGF="..value);
+    return response;
+end
+_M.set_cmgf = set_cmgf
+
 return _M

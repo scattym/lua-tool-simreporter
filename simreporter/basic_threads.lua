@@ -17,6 +17,7 @@ local aes = require("aes")
 local out_command = require("out_command")
 local mqtt_thread = require("mqtt_thread")
 local socket_thread = require("socket_thread")
+local sms_lib = require("sms_lib")
 
 local logger = logging.create("basic_threads", 30)
 
@@ -362,9 +363,20 @@ local function process_out_cmd()
 end
 
 local function testing_thread()
+    while true do
+        pcall(socket_thread.socket_thread(8, imei, running_version))
+        logger(30, "Socket thread exited. Sleeping before restart")
+        thread.sleep(10000)
+    end
+end
 
-    socket_thread.socket_thread(8, imei, running_version)
+local function start_sms_thread()
 
+    while true do
+        pcall(sms_lib.wait_for_sms_thread(imei))
+        logger(30, "SMS thread exitied. Sleeping before restart")
+        thread.sleep(10000)
+    end
 end
 
 local function get_battery_percent()
@@ -400,6 +412,7 @@ local start_threads = function (version)
     local out_cmd_thread = thread.create(process_out_cmd)
     local test_thread = thread.create(testing_thread)
     local charging_check_thread = thread.create(charging_check)
+    local sms_wait_thread = thread.create(start_sms_thread)
     logger(10, "GPS tick thread: ", tostring(gps_tick_thread));
     logger(10, "cell_tick_thread: ", tostring(cell_tick_thread));
     logger(10, "Firmware check thread: ", tostring(firmware_check_thread));
@@ -407,6 +420,7 @@ local start_threads = function (version)
     logger(10, "Command parser thread: ", tostring(out_cmd_thread))
     logger(10, "Test thread: ", tostring(test_thread))
     logger(10, "Charging check thread: ", tostring(charging_check_thread))
+    logger(10, "SMS wait thread: ", tostring(sms_wait_thread))
     local result
     -- thread.sleep(1000);
     logger(10, "Starting threads");
@@ -424,10 +438,12 @@ local start_threads = function (version)
     logger(10, "Command parser start thread result is ", tostring(result));
     result = thread.run(charging_check_thread)
     logger(10, "Charging check start thread result is ", tostring(result));
+    result = thread.run(sms_wait_thread)
+    logger(10, "SMS thread start result is ", tostring(result));
 
     logger(10, "Threads are running");
     local counter = 0
-    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) do
+    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) and thread.running(sms_wait_thread) do
     --while thread.running(config_update_thread) do
         logger(10, "All threads still running");
         logger(10, "Peak memory used: ", getpeakmem());
@@ -441,6 +457,7 @@ local start_threads = function (version)
             thread.stop(out_cmd_thread);
             thread.stop(test_thread);
             thread.stop(charging_check_thread);
+            thread.stop(sms_wait_thread);
             gps.gpsclose();
             break;
         end;
@@ -462,6 +479,7 @@ local start_threads = function (version)
     logger(30, "Command parser thread running: ", thread.running(out_cmd_thread));
     logger(30, "Charging check thread running: ", thread.running(charging_check_thread));
     logger(30, "Socket thread running: ", thread.running(test_thread));
+    logger(30, "SMS wait thread running: ", thread.running(sms_wait_thread));
     logger(30, "Loop counter: ", counter);
     thread.sleep(2000)
     at.reset()
