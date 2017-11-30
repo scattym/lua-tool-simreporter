@@ -5,7 +5,7 @@ local config = require("config")
 local util = require("util")
 local logging = require("logging")
 local at_abs = require("at_abs")
-local logger = logging.create("sms_lib", 0)
+local logger = logging.create("sms_lib", 30)
 
 local SMS_EVENT_ID = 26
 
@@ -66,7 +66,7 @@ local wait_for_sms_thread = function(imei)
     -- at.set_cmgf("1")
 
     sms.set_cmgf(1);
-    thread.setevtowner(SMS_EVENT_ID,SMS_EVENT_ID)
+    thread.setevtowner(SMS_EVENT_ID, SMS_EVENT_ID)
     local sms_ready = false
     while not sms_ready do
         sms_ready = sms.ready();
