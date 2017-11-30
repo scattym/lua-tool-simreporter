@@ -65,7 +65,7 @@ end
 local wait_for_sms_thread = function(imei)
     -- at.set_cmgf("1")
 
-
+    sms.set_cmgf(1);
     thread.setevtowner(SMS_EVENT_ID,SMS_EVENT_ID)
     local sms_ready = false
     while not sms_ready do
