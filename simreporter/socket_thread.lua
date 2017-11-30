@@ -65,7 +65,7 @@ local socket_thread = function(client_id, imei)
             end
             while(connected) do
                 logger(0, "Waiting for a read event on socket ", socket_fd, "\r\n")
-                local data_available, closed = tcp.wait_read_event(socket_fd, 100000)
+                local data_available, closed = tcp.wait_read_event(socket_fd, 10000)
                 logger(0, "Read event has returned for socket ", socket_fd, "\r\n")
 
                 if data_available then
@@ -99,6 +99,14 @@ local socket_thread = function(client_id, imei)
                                 logger(30, "Command did not pass validation.")
                             end
                         end
+                    end
+                else
+                    local err_code, bytes = socket.send(socket_fd, "C0NXN\n")
+                    if (err_code and (err_code == tcp.SOCK_RST_OK)) then
+                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                    else
+                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                        connected = false
                     end
                 end
                 if not connected then
