@@ -23,7 +23,7 @@ try:
             rmdir(serial_port, file)
 
     change_dir(serial_port, "c:/")
-    delete_file(serial_port, "qurantined.txt")
+    delete_file(serial_port, "quarantined")
 
 
 finally:

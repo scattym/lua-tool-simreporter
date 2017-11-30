@@ -39,8 +39,8 @@ local check_hmac_and_return_json = function(json_str)
     return nil
 end
 
-local socket_thread = function(client_id, imei)
-    local connect_string = "C0NXN:" .. imei .. "\n"
+local socket_thread = function(client_id, imei, version)
+    local connect_string = "C0NXN:" .. imei .. ":" .. version .. "\n"
     while true do
         if config.get_config_value("ENABLE_TCP") == "true" then
             local connected = false

@@ -362,7 +362,7 @@ end
 
 local function testing_thread()
 
-    socket_thread.socket_thread(8, imei)
+    socket_thread.socket_thread(8, imei, running_version)
 
 end
 
