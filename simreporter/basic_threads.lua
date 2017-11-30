@@ -217,6 +217,7 @@ local function gps_tick()
                     if config.get_config_value("REPORT_DEVICE_INFO_WITH_GPS") == "true" then
                         local cell_table = device.get_device_info_table();
                         cell_table["extra_info"] = EXTRA_INFO
+                        cell_table["running_version"] = tostring(running_version)
 
                         local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
 
