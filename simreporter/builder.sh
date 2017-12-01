@@ -19,7 +19,7 @@ while true; do
                 tag_name=`basename ${without_zip}`
                 git tag ${tag_name}
                 git push --tags
-                curl -X POST --user "${BB_AUTH_STRING}" "https://api.bitbucket.org/2.0/repositories/${BB_USER}/${lua-tool-simreporter}/downloads" --form files=@"${image}"
+                curl -X POST --user "${BB_AUTH_STRING}" "https://api.bitbucket.org/2.0/repositories/${BB_USER}/lua-tool-simreporter/downloads" --form files=@"${image}"
             fi
         fi
     fi
