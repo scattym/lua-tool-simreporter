@@ -78,10 +78,10 @@ local wait_for_sms_thread = function(imei)
         thread.sleep(10000)
     end
 
-    print("Setting to get +CMTI/+CSDI\r\n");
+    -- print("Setting to get +CMTI/+CSDI\r\n");
     sms.set_cnmi(2,1)
 
-    print("Wait +CMTI or +CDSI now...\r\n");
+    -- print("Wait +CMTI or +CDSI now...\r\n");
     while (true) do
         local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(150000);
         if (evt ~= -1) then
