@@ -36,7 +36,7 @@ end
 
 local parse_sms_message = function(message)
     local return_table = {}
-    local line_array = split(message:gsub("\r", ""), "\n")
+    local line_array = util.split(message:gsub("\r", ""), "\n")
     if #line_array >= 1 then
         return_table = parse_sms_header(line_array[1])
         if not return_table then
@@ -78,10 +78,10 @@ local wait_for_sms_thread = function(imei)
         thread.sleep(10000)
     end
 
-    print("Setting to get +CMTI/+CSDI\r\n");
-    sms.set_cnmi(2,1)
+    -- print("Setting to get +CMTI/+CSDI\r\n");
+    sms.set_cnmi(2, 1, 2, 2, 0)
 
-    print("Wait +CMTI or +CDSI now...\r\n");
+    -- print("Wait +CMTI or +CDSI now...\r\n");
     while (true) do
         local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(150000);
         if (evt ~= -1) then
@@ -107,15 +107,20 @@ local wait_for_sms_thread = function(imei)
                 if message then
                     logger(0, "Parsed message from phone number: ", message["phone"], " at ", message["date"])
                     logger(0, "Message is ", message["message"])
-                    if message["message"]:gmatch("GPSPLEASE") then
+                    if message["message"]:match("GPSPLEASE") then
+                        local send_content = imei
                         local gps_info = at_abs.get_location()
                         -- "lat", "north_south", "long", "east_west", "date", "time", "altitude", "speed", "course"
-                        if gps_info then
-                            local response = imei .. ":lat" .. tostring(gps_info["lat"]) .. tostring(gps_info["north_south"]) .. ":long" .. tostring(gps_info["long"]) .. tostring(gps_info["east_west"])
-                            send_message_to_number(response, message["phone"])
+                        if gps_info and gps_info["lat"] and gps_info["lat"] ~= "" then
+                            send_content = send_content .. ":lat" .. tostring(gps_info["lat"]) .. tostring(gps_info["north_south"]) .. ":long" .. tostring(gps_info["long"]) .. tostring(gps_info["east_west"])
+                            -- local response = imei .. ":lat" .. tostring(gps_info["lat"]) .. tostring(gps_info["north_south"]) .. ":long" .. tostring(gps_info["long"]) .. tostring(gps_info["east_west"])
+                            -- 
+                        else
+                            send_content = send_content .. " no current gps signal"
                         end
+                        send_message_to_number(send_content, message["phone"])
                     end
-                    if message["message"]:gmatch("RESETPLEASE") then
+                    if message["message"]:match("RESETPLEASE") then
                         at.reset()
                     end
                 else
