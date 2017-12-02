@@ -113,7 +113,7 @@ local response_to_array = function(response, key, key_val_sep, field_sep, field_
     for num = 1,#line_array do
         logger.log("util", 0, "Processing line ", tostring(line_array[num]));
         if not line_array[num] then
-            loggerl.log("util", 30, "Did not get a line to parse. Line is nil.")
+            logger.log("util", 30, "Did not get a line to parse. Line is nil.")
         else
             if string.match(line_array[num], key) then
                 logger.log("util", 0, "Found key: ", key, " in line: ", line_array[num])
