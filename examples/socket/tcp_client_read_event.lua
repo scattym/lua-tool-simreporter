@@ -1,37 +1,37 @@
 function wait_read_event(sockfd, timeout)
-  local remote_closed = false;
-  print("wait_read_event, sockfd=", sockfd, ", timeout=", timeout, "\r\n");
-  local start_tick = os.clock();
-  while (true) do
-    local cur_tick = os.clock();
-	timeout = timeout - (cur_tick - start_tick)*1000;
-	if (timeout < 0) then
-	  timeout = 0;
-	end;
-    local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(timeout);
-	if (evt and evt >= 0) then
-	  print("waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
-	end;
-    if (evt and evt == SOCKET_EVENT) then
-	  local sock_or_net_event = evt_p1;--0=>network event, usually ("LOST NETWORK"); 1=>socket event.
-	  local evt_sockfd = evt_p2;
-	  local event_mask = evt_p3;
-	  if ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_CLOSE_EVENT) ~= 0)) then
-	    --socket closed by remote side
-		remote_closed = true;
-	    print("waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
-	    return false, remote_closed;
-      elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_READ_EVENT) ~= 0)) then
-	    print("waited READ event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
-	    return true, remote_closed;
-	  end;
-	end;
-	local cur_tick = os.clock();
-	if ((cur_tick - start_tick)*1000 >= timeout) then
-	  break;
-	end;
-  end;
-  return false, remote_closed;
+    local remote_closed = false;
+    print("wait_read_event, sockfd=", sockfd, ", timeout=", timeout, "\r\n");
+    local start_tick = os.clock();
+    while (true) do
+        local cur_tick = os.clock();
+        timeout = timeout - (cur_tick - start_tick)*1000;
+        if (timeout < 0) then
+          timeout = 0;
+        end;
+        local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(timeout);
+        if (evt and evt >= 0) then
+            print("waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+        end;
+        if (evt and evt == SOCKET_EVENT) then
+            local sock_or_net_event = evt_p1;--0=>network event, usually ("LOST NETWORK"); 1=>socket event.
+            local evt_sockfd = evt_p2;
+            local event_mask = evt_p3;
+            if ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_CLOSE_EVENT) ~= 0)) then
+            --socket closed by remote side
+                remote_closed = true;
+                print("waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+                return false, remote_closed;
+            elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_READ_EVENT) ~= 0)) then
+                print("waited READ event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+                return true, remote_closed;
+            end;
+        end;
+        local cur_tick = os.clock();
+        if ((cur_tick - start_tick)*1000 >= timeout) then
+            break;
+        end;
+    end;
+    return false, remote_closed;
 end;
 
 function check_network_dorm_function(app_handle)

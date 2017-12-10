@@ -39,6 +39,16 @@ local check_hmac_and_return_json = function(json_str)
     return nil
 end
 
+local BUFFER
+local send_data = function(client_id, data)
+    if data then
+        BUFFER = data
+        if CLIENT_TO_SOCKET[client_id] then
+            setevt(40, CLIENT_TO_SOCKET[client_id])
+        end
+    end
+end
+
 local socket_thread = function(client_id, imei, version)
     local connect_string = "C0NXN:" .. imei .. ":" .. version .. "\n"
     while true do
@@ -66,7 +76,7 @@ local socket_thread = function(client_id, imei, version)
             end
             while(connected) do
                 logger(0, "Waiting for a read event on socket ", socket_fd, "\r\n")
-                local data_available, closed = tcp.wait_read_event(socket_fd, config.get_config_value("SOCK_HEARTBEAT_INTERVAL"))
+                local data_available, send_ready, closed = tcp.wait_read_event(socket_fd, config.get_config_value("SOCK_HEARTBEAT_INTERVAL"))
                 logger(0, "Read event has returned for socket ", socket_fd, "\r\n")
 
                 if data_available then
@@ -100,6 +110,14 @@ local socket_thread = function(client_id, imei, version)
                                 logger(30, "Command did not pass validation.")
                             end
                         end
+                    end
+                elseif send_ready then
+                    local err_code, bytes = socker.send(socket_fd, BUFFER)
+                    if (err_code and (err_code == tcp.SOCK_RST_OK)) then
+                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                    else
+                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                        connected = false
                     end
                 else
                     local err_code, bytes = socket.send(socket_fd, "C0NXN>")

@@ -49,6 +49,7 @@ CONFIG["CHECK_FOR_FIRMWARE_IN_THREADS"] = "true"
 CONFIG["INACTIVITY_REBOOT_TIME"] = 3600
 CONFIG["SHOULD_REBOOT"] = "false"
 CONFIG["SOCK_HEARTBEAT_INTERVAL"] = 60000
+CONFIG["MJC_PATH"] = "/v2/process_mjc"
 
 local client_id = 4
 logger.create_logger("config", 30)
@@ -98,6 +99,7 @@ local MUST_BE_STRING = {
     "ENABLE_TCP",
     "CHECK_FOR_CHARGING",
     "SHOULD_REBOOT",
+    "MJC_PATH",
 }
 
 local MUST_BE_BOOLEAN = {

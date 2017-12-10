@@ -370,6 +370,7 @@ _M.wait_read_events = wait_read_events
 
 local wait_read_event = function(sockfd, timeout)
     thread.setevtowner(22,22)
+    thread.setevtowner(40,40)
 
     local SOCKET_EVENT = 22
     local SOCK_WRITE_EVENT = 1
@@ -390,7 +391,7 @@ local wait_read_event = function(sockfd, timeout)
 
         local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(timeout);
         if (evt and evt >= 0) then
-            logger(0, "waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+            logger(30, "waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
         end;
         if (evt and evt == SOCKET_EVENT) then
             logger(0, "Event is a socket event\r\n")
@@ -401,20 +402,22 @@ local wait_read_event = function(sockfd, timeout)
                 --socket closed by remote side
                 logger(30, "Socket closed by remote side\r\n")
                 logger(0, "waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
-                return true, true;
+                return true, false, true;
             elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_READ_EVENT) ~= 0)) then
                 logger(0, "waited READ event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
-                return true, false;
+                return true, false, false;
             else
                 logger(0, "Not socket read or close event\r\n")
             end;
+        elseif evt and evt == 40 and evt_p1 and evt_p1 == sockfd then
+            return false, true, false
         end;
         local cur_tick = os.clock();
         if ((cur_tick - start_tick)*1000 >= timeout) then
             break;
         end;
     end;
-    return false, remote_closed;
+    return false, false, remote_closed;
 end;
 _M.wait_read_event = wait_read_event
 

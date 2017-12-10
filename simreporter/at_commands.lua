@@ -1,6 +1,17 @@
 local logger = require("logging")
 local _M = {}
 
+--supported port for atctl.setport(...)
+_M.ATCTL_UART_PORT  = 1
+_M.ATCTL_MODEM_PORT = 2
+_M.ATCTL_USBAT_PORT = 3
+--  -1 is used to release the port
+_M.ATCTL_INVALID_PORT = -1
+
+_M.AT_CTL_EVENT = 30
+
+local CMD_CALLBACKS = {}
+
 local run_command = function(cmd)
     logger.log("at_commands", 0, "Running command: ", cmd, "<<")
     logger.log("at_commands", 0, "Thread entering critical section");
@@ -212,5 +223,34 @@ local set_cmgf = function(value)
     return response;
 end
 _M.set_cmgf = set_cmgf
+
+local register_command = function(command, callback, async)
+    if not async or async < 0 or async > 1 then
+        logger.log("at_commands", 30, "Invalid async option. Setting to 0.")
+        async = 0
+    end
+    atctl.atcadd(command, async)
+    CMD_CALLBACKS[command] = callback
+end
+_M.register_command = register_command
+
+local wait_at_command_thread = function()
+    thread.setevtowner(_M.AT_CTL_EVENT, _M.AT_CTL_EVENT)
+    while true do
+        local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(9999999)
+        if(evt == _M.AT_CTL_EVENT) then
+            local cmd_port, cmd_name, cmd_op, cmd_line, cmd_status = atctl.atcget()
+            if CMD_CALLBACKS[cmd_name] then
+                CMD_CALLBACKS[cmd_name](cmd_port, cmd_name, cmd_op, cmd_line, cmd_status)
+            else
+                logger.log("at_commands", 30, "No function handler for command: ", cmd_name)
+            end
+        else
+            logger.log("at_commands", 30, "Got an event we are not listening for. Event: ", evt)
+        end
+        collectgarbage()
+    end
+end
+_M.wait_at_command_thread = wait_at_command_thread
 
 return _M

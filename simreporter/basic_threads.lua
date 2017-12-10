@@ -30,6 +30,10 @@ local enc_key = ""
 local EXTRA_INFO = {}
 local running_version;
 
+local NET_CLIENT_ID_GPS = 1
+local NET_CLIENT_ID_MJC = 5
+local NET_CLIENT_ID_SOCKET = 8
+
 local function tohex(data)
     return (data:gsub(".", function (x)
         return ("%02x"):format(x:byte()) end)
@@ -362,10 +366,44 @@ local function process_out_cmd()
     out_command.wait_and_parse_loop(callback_table)
 end
 
+local function handle_mjc_command(cmd_port, cmd_name, cmd_op, cmd_line, cmd_status)
+    logger(30, "Got a mjc command")
+    logger(30, cmd_port)
+    logger(30, cmd_name)
+    logger(30, cmd_op)
+    logger(30, cmd_line)
+    logger(30, cmd_status)
+    local command, value = cmd_line:match("([^=]+)=(.*)")
+    logger(30, "Command: ", command, " value: ", value)
+    local data = json.decode(value)
+    socket_thread.send_data(NET_CLIENT_ID_SOCKET, value)
+    if data then
+        local sent = false
+        while not sent do
+            local result, headers, response = tcp.http_open_send_close(NET_CLIENT_ID_MJC, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("MJC_PATH"), encapsulated_payload, {}, true);
+            if result and headers["response_code"] == "200" then
+                sent = true
+            else
+                logger(30, "MJC update failed. Result is ", tostring(result), " and response is ", response);
+            end
+            thread.sleep(10000)
+        end
+    end
+end
+
 local function testing_thread()
+    at.register_command("+MJC", handle_mjc_command, 1)
     while true do
-        pcall(socket_thread.socket_thread(8, imei, running_version))
-        logger(30, "Socket thread exited. Sleeping before restart")
+        pcall(at.wait_at_command_thread())
+        logger(30, "Wait command function exited. Sleeping before restart")
+        thread.sleep(10000)
+    end
+end
+
+local function socket_thread_f()
+    while true do
+        pcall(socket_thread.socket_thread(NET_CLIENT_ID_SOCKET, imei, running_version))
+        logger(30, "Socket function exited. Sleeping before restart")
         thread.sleep(10000)
     end
 end
@@ -374,7 +412,7 @@ local function start_sms_thread()
 
     while true do
         pcall(sms_lib.wait_for_sms_thread(imei))
-        logger(30, "SMS thread exitied. Sleeping before restart")
+        logger(30, "SMS function exitied. Sleeping before restart")
         thread.sleep(10000)
     end
 end
@@ -413,6 +451,7 @@ local start_threads = function (version)
     local test_thread = thread.create(testing_thread)
     local charging_check_thread = thread.create(charging_check)
     local sms_wait_thread = thread.create(start_sms_thread)
+    local socket_thread = thread.create(socket_thread_f)
     logger(10, "GPS tick thread: ", tostring(gps_tick_thread));
     logger(10, "cell_tick_thread: ", tostring(cell_tick_thread));
     logger(10, "Firmware check thread: ", tostring(firmware_check_thread));
@@ -421,46 +460,50 @@ local start_threads = function (version)
     logger(10, "Test thread: ", tostring(test_thread))
     logger(10, "Charging check thread: ", tostring(charging_check_thread))
     logger(10, "SMS wait thread: ", tostring(sms_wait_thread))
+    logger(10, "Socket thread: ", tostring(socket_thread))
     local result
     -- thread.sleep(1000);
     logger(10, "Starting threads");
-    result = thread.run(config_update_thread);
-    logger(10, "Config update start thread result is ", tostring(result));
-    result = thread.run(gps_tick_thread);
-    logger(10, "GPS start thread result is ", tostring(result));
-    result = thread.run(cell_tick_thread);
-    logger(10, "Cell data start thread result is ", tostring(result));
-    result = thread.run(firmware_check_thread);
-    logger(10, "Firmware check start thread result is ", tostring(result));
-    result = thread.run(out_cmd_thread);
-    logger(10, "Command parser start thread result is ", tostring(result));
-    result = thread.run(test_thread);
-    logger(10, "Command parser start thread result is ", tostring(result));
+    result = thread.run(config_update_thread)
+    logger(10, "Config update start thread result is ", tostring(result))
+    result = thread.run(gps_tick_thread)
+    logger(10, "GPS start thread result is ", tostring(result))
+    result = thread.run(cell_tick_thread)
+    logger(10, "Cell data start thread result is ", tostring(result))
+    result = thread.run(firmware_check_thread)
+    logger(10, "Firmware check start thread result is ", tostring(result))
+    result = thread.run(out_cmd_thread)
+    logger(10, "Command parser start thread result is ", tostring(result))
+    result = thread.run(test_thread)
+    logger(10, "Command parser start thread result is ", tostring(result))
     result = thread.run(charging_check_thread)
-    logger(10, "Charging check start thread result is ", tostring(result));
+    logger(10, "Charging check start thread result is ", tostring(result))
     result = thread.run(sms_wait_thread)
-    logger(10, "SMS thread start result is ", tostring(result));
+    logger(10, "SMS thread start result is ", tostring(result))
+    result = thread.run(socket_thread)
+    logger(10, "Socket thread start result is ", tostring(result))
 
     logger(10, "Threads are running");
     local counter = 0
-    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) and thread.running(sms_wait_thread) do
+    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) and thread.running(sms_wait_thread) and thread.running(socket_thread)do
     --while thread.running(config_update_thread) do
         logger(10, "All threads still running");
         logger(10, "Peak memory used: ", getpeakmem());
         counter = counter+1;
         local main_thread_loop_count = config.get_config_value("MAX_MAIN_THREAD_LOOP_COUNT")
         if( main_thread_loop_count > 0 and counter > main_thread_loop_count) then
-            thread.stop(gps_tick_thread);
-            thread.stop(cell_tick_thread);
-            thread.stop(firmware_check_thread);
-            thread.stop(config_update_thread);
-            thread.stop(out_cmd_thread);
-            thread.stop(test_thread);
-            thread.stop(charging_check_thread);
-            thread.stop(sms_wait_thread);
-            gps.gpsclose();
-            break;
-        end;
+            thread.stop(gps_tick_thread)
+            thread.stop(cell_tick_thread)
+            thread.stop(firmware_check_thread)
+            thread.stop(config_update_thread)
+            thread.stop(out_cmd_thread)
+            thread.stop(test_thread)
+            thread.stop(charging_check_thread)
+            thread.stop(sms_wait_thread)
+            thread.stop(socket_thread)
+            gps.gpsclose()
+            break
+        end
 
         collectgarbage();
         if should_reboot() then
@@ -480,6 +523,7 @@ local start_threads = function (version)
     logger(30, "Charging check thread running: ", thread.running(charging_check_thread));
     logger(30, "Socket thread running: ", thread.running(test_thread));
     logger(30, "SMS wait thread running: ", thread.running(sms_wait_thread));
+    logger(30, "Socket thread running: ", thread.running(socket_thread));
     logger(30, "Loop counter: ", counter);
     thread.sleep(2000)
     at.reset()
