@@ -379,7 +379,8 @@ local function handle_mjc_command(cmd_port, cmd_name, cmd_op, cmd_line, cmd_stat
     socket_thread.send_data(NET_CLIENT_ID_SOCKET, value)
     if data then
         local sent = false
-        while not sent do
+        local sent_count = 0
+        while not sent and sent_count < config.get_value("MAX_MJC_ATTEMPTS")do
             local result, headers, response = tcp.http_open_send_close(NET_CLIENT_ID_MJC, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("MJC_PATH"), encapsulated_payload, {}, true);
             if result and headers["response_code"] == "200" then
                 sent = true
@@ -387,6 +388,9 @@ local function handle_mjc_command(cmd_port, cmd_name, cmd_op, cmd_line, cmd_stat
                 logger(30, "MJC update failed. Result is ", tostring(result), " and response is ", response);
             end
             thread.sleep(10000)
+        end
+        if sent == false then
+            logger(30, "All attempts to update failed. Giving up.")
         end
     end
 end
