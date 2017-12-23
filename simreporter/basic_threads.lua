@@ -376,9 +376,13 @@ local function process_out_cmd()
 end
 
 local MESSAGE_QUEUE = {}
-local function add_message(message)
+local function add_message(message, osclock)
     local data = {}
-    data["osclock"] = system.get_up_time()
+    if osclock then
+        data["osclock"] = osclock
+    else
+        data["osclock"] = system.get_up_time()
+    end
     data["message"] = message
     thread.enter_cs(CRITICAL_SECTION_REPORTER)
     table.insert(MESSAGE_QUEUE, data)
@@ -425,6 +429,7 @@ local function card_reader_send_thread_f()
                     else
                         logger(30, "Card data update failed. Result is ", tostring(result), " and response is ", response)
                         failure_count = failure_count + 1
+                        add_message(data["message"], data["osclock"])
                     end
                     collectgarbage();
                 else
