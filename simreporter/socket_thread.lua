@@ -39,7 +39,7 @@ local check_hmac_and_return_json = function(json_str)
     return nil
 end
 
-local BUFFER
+local BUFFER = ""
 local send_data = function(client_id, data)
     if data then
         BUFFER = data
@@ -63,9 +63,9 @@ local socket_thread = function(client_id, imei, version)
                 local err_code, bytes = socket.send(socket_fd, connect_string)
 
                 if (err_code and (err_code == tcp.SOCK_RST_OK)) then
-                    logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                    logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                 else
-                    logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                    logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                     connected = false
                     socket.close(socket_fd)
                     CLIENT_TO_SOCKET[client_id] = -1
@@ -75,20 +75,20 @@ local socket_thread = function(client_id, imei, version)
                 logger(30, "Connection to host: ", config.get_config_value("SOCK_HOST"), " port: ", config.get_config_value("SOCK_PORT"), " client_id: ", client_id, " failed")
             end
             while(connected) do
-                logger(0, "Waiting for a read event on socket ", socket_fd, "\r\n")
+                logger(0, "Waiting for a read event on socket ", socket_fd)
                 local data_available, send_ready, closed = tcp.wait_read_event(socket_fd, config.get_config_value("SOCK_HEARTBEAT_INTERVAL"))
-                logger(0, "Read event has returned for socket ", socket_fd, "\r\n")
+                logger(0, "Read event has returned for socket ", socket_fd)
 
                 if data_available then
                     local err_code, data = socket.recv(socket_fd, 100)
-                    logger(0, "Data received. err_code: ", tostring(err_code), ", data: ", tostring(data), "\r\n")
+                    logger(0, "Data received. err_code: ", tostring(err_code), ", data: ", tostring(data))
                     if (err_code and (err_code == tcp.SOCK_RST_SOCK_FAILED)) then
-                        logger(30, "Socket recv failed: ", tostring(err_code), ", data: ", tostring(data), "\r\n")
+                        logger(30, "Socket recv failed: ", tostring(err_code), ", data: ", tostring(data))
                         closed = true
                     end
 
                     if closed then
-                        logger(30, "connection closed\r\n")
+                        logger(30, "connection closed")
                         connected = false
                     else
                         if( data ~= nil ) then
@@ -100,9 +100,9 @@ local socket_thread = function(client_id, imei, version)
                                     local err_code, bytes = socket.send(socket_fd, return_string)
 
                                     if (err_code and (err_code == tcp.SOCK_RST_OK)) then
-                                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                                     else
-                                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                                         connected = false
                                     end
                                 end
@@ -114,17 +114,17 @@ local socket_thread = function(client_id, imei, version)
                 elseif send_ready then
                     local err_code, bytes = socker.send(socket_fd, BUFFER)
                     if (err_code and (err_code == tcp.SOCK_RST_OK)) then
-                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                     else
-                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                         connected = false
                     end
                 else
                     local err_code, bytes = socket.send(socket_fd, "C0NXN>")
                     if (err_code and (err_code == tcp.SOCK_RST_OK)) then
-                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                     else
-                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes), "\r\n")
+                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                         connected = false
                     end
                 end
@@ -135,7 +135,7 @@ local socket_thread = function(client_id, imei, version)
                 end
             end
         end
-        logger(0, "Sleeping\r\n")
+        logger(0, "Sleeping")
         thread.sleep(config.get_config_value("TCP_SLEEP_TIME"))
     end
 end

@@ -50,6 +50,7 @@ CONFIG["INACTIVITY_REBOOT_TIME"] = 3600
 CONFIG["SHOULD_REBOOT"] = "false"
 CONFIG["SOCK_HEARTBEAT_INTERVAL"] = 60000
 CONFIG["MJC_PATH"] = "/v2/process_mjc"
+CONFIG["MAX_MJC_ATTEMPTS"] = 10
 
 local client_id = 4
 logger.create_logger("config", 30)
@@ -82,6 +83,7 @@ local MUST_BE_INTS = {
     "GPS_THREAD_SLEEP_TIME",
     "INACTIVITY_REBOOT_TIME",
     "SOCK_HEARTBEAT_INTERVAL",
+    "MAX_MJC_ATTEMPTS",
 }
 
 local MUST_BE_STRING = {
