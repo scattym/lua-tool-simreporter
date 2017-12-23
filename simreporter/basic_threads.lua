@@ -527,6 +527,7 @@ local start_threads = function (version)
     logger(30, "Loop counter: ", counter);
     thread.sleep(2000)
     at.reset()
+    return false
 end;
 
 _M.start_threads = start_threads
