@@ -224,7 +224,8 @@ collectgarbage();
 print("Starting threads\r\n")
 local status, result = pcall(basic_threads.start_threads(running_version))
 
-print("exit main thread\r\n");
+print("exit main thread\r\n")
 
-print(result);
+print(result)
+print(status)
 sio.send("AT+CRESET\r\n")
