@@ -31,8 +31,17 @@ local EXTRA_INFO = {}
 local running_version;
 
 local NET_CLIENT_ID_GPS = 1
-local NET_CLIENT_ID_MJC = 5
+local NET_CLIENT_ID_CARD = 5
 local NET_CLIENT_ID_SOCKET = 8
+local NET_CLIENT_ID_MESSAGE_QUEUE = 9
+
+local CRITICAL_SECTION_CELL = 2
+local CRITICAL_SECTION_CHARGING_CHECK = 6
+local CRITICAL_SECTION_GPS = 7
+local CRITICAL_SECTION_REPORTER = 8
+
+local WAIT_EVENT_SOCKET_SEND = 40
+local WAIT_EVENT_MESSAGE_QUEUE = 41
 
 local function tohex(data)
     return (data:gsub(".", function (x)
@@ -41,21 +50,21 @@ local function tohex(data)
 end
 
 local function update_last_gps_report()
-    thread.enter_cs(7);
+    thread.enter_cs(CRITICAL_SECTION_GPS);
     last_gps_report = os.clock();
-    thread.leave_cs(7);
+    thread.leave_cs(CRITICAL_SECTION_GPS);
 end;
 
 local function update_last_cell_report()
-    thread.enter_cs(2);
+    thread.enter_cs(CRITICAL_SECTION_CELL);
     last_cell_report = os.clock();
-    thread.leave_cs(2);
+    thread.leave_cs(CRITICAL_SECTION_CELL);
 end;
 
 local function last_gps_report_has_expired()
-    thread.enter_cs(7);
+    thread.enter_cs(CRITICAL_SECTION_GPS);
     local copy_of_last_gps_report = last_gps_report;
-    thread.leave_cs(7);
+    thread.leave_cs(CRITICAL_SECTION_GPS);
     local now = os.clock();
     local time_since_last_report = now - copy_of_last_gps_report;
     logger(10, "Now is: ", tostring(now), " last reported time is: ", tostring(copy_of_last_gps_report), " difference is: ", tostring(time_since_last_report));
@@ -71,9 +80,9 @@ local function last_gps_report_has_expired()
 end;
 
 local function last_cell_report_has_expired()
-    thread.enter_cs(2);
+    thread.enter_cs(CRITICAL_SECTION_CELL);
     local copy_of_last_cell_report = last_cell_report;
-    thread.leave_cs(2);
+    thread.leave_cs(CRITICAL_SECTION_CELL);
     local now = os.clock();
     local time_since_last_report = now - copy_of_last_cell_report;
     logger(10, "Now is: ", tostring(now), " last reported time is: ", tostring(copy_of_last_cell_report), " difference is: ", tostring(time_since_last_report));
@@ -92,9 +101,9 @@ local function should_reboot()
     if config.get_config_value("SHOULD_REBOOT") == "true" then
         return true
     end
-    thread.enter_cs(2)
+    thread.enter_cs(CRITICAL_SECTION_CELL)
     local copy_of_last_cell_report = last_cell_report
-    thread.leave_cs(2)
+    thread.leave_cs(CRITICAL_SECTION_CELL)
     local now = os.clock();
     local time_since_last_report = now - copy_of_last_cell_report
     logger(10, "should_reboot(): Now is: ", tostring(now), " last reported time is: ", tostring(copy_of_last_cell_report), " difference is: ", tostring(time_since_last_report));
@@ -126,9 +135,9 @@ end
 
 local IS_CHARGING = true
 local function set_charging(value)
-    thread.enter_cs(6)
+    thread.enter_cs(CRITICAL_SECTION_CHARGING_CHECK)
     IS_CHARGING = value
-    thread.leave_cs(6)
+    thread.leave_cs(CRITICAL_SECTION_CHARGING_CHECK)
 end
 
 function is_charging()
@@ -136,9 +145,9 @@ function is_charging()
         return true
     end
     local return_val
-    thread.enter_cs(6)
+    thread.enter_cs(CRITICAL_SECTION_CHARGING_CHECK)
     return_val = IS_CHARGING
-    thread.leave_cs(6)
+    thread.leave_cs(CRITICAL_SECTION_CHARGING_CHECK)
     return return_val
 end
 
@@ -366,8 +375,69 @@ local function process_out_cmd()
     out_command.wait_and_parse_loop(callback_table)
 end
 
-local function handle_mjc_command(cmd_port, cmd_name, cmd_op, cmd_line, cmd_status)
-    logger(30, "Got a mjc command")
+local MESSAGE_QUEUE = {}
+local function add_message(message)
+    local data = {}
+    data["osclock"] = system.get_up_time()
+    data["message"] = message
+    thread.enter_cs(CRITICAL_SECTION_REPORTER)
+    table.insert(MESSAGE_QUEUE, data)
+    thread.leave_cs(CRITICAL_SECTION_REPORTER)
+    setevt(WAIT_EVENT_MESSAGE_QUEUE)
+end
+local function get_message()
+    local return_val
+    if #MESSAGE_QUEUE > 0 then
+        thread.enter_cs(CRITICAL_SECTION_REPORTER)
+        return_val = MESSAGE_QUEUE[1]
+        table.remove(MESSAGE_QUEUE, 1)
+        thread.leave_cs(CRITICAL_SECTION_REPORTER)
+    end
+    return return_val
+end
+local function queue_length()
+    local return_val = 0
+    thread.enter_cs(CRITICAL_SECTION_REPORTER)
+    return_val = #MESSAGE_QUEUE
+    thread.leave_cs(CRITICAL_SECTION_REPORTER)
+    return return_val
+end
+
+local function card_reader_send_thread_f()
+    thread.setevtowner(WAIT_EVENT_MESSAGE_QUEUE, WAIT_EVENT_MESSAGE_QUEUE)
+
+    local key_data = true
+
+    while true do
+        local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(100000)
+        if (evt and evt >= 0) then
+            local failure_count = 0
+            logger(0, "waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock)
+            while queue_length() > 0 and failure_count < config.get_value("MAX_CARD_ATTEMPTS") do
+                local data = get_message()
+                if data and data["osclock"] and data["message"] then
+                    data["age"] = data["osclock"] - system.get_up_time()
+                    local encapsulated_payload = encaps.encapsulate_data(ati_string, data, 0, 0)
+                    local result, headers, response = tcp.http_open_send_close(NET_CLIENT_ID_MESSAGE_QUEUE, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CARD_READ_PATH"), encapsulated_payload, {}, key_data)
+                    logger(10, "Result is ", tostring(result), " and response is ", response)
+                    if result and headers["response_code"] == "200" then
+                        logger(0, "Card data was sent.")
+                    else
+                        logger(30, "Card data update failed. Result is ", tostring(result), " and response is ", response)
+                        failure_count = failure_count + 1
+                    end
+                    collectgarbage();
+                else
+                    logger(30, "Data to send but no data returned. Oboject is: ", data)
+                    failure_count = failure_count + 1
+                end
+            end
+        end
+    end
+end
+
+local function handle_card_read_command(cmd_port, cmd_name, cmd_op, cmd_line, cmd_status)
+    logger(30, "Got a card read command")
     logger(30, cmd_port)
     logger(30, cmd_name)
     logger(30, cmd_op)
@@ -375,28 +445,11 @@ local function handle_mjc_command(cmd_port, cmd_name, cmd_op, cmd_line, cmd_stat
     logger(30, cmd_status)
     local command, value = cmd_line:match("([^=]+)=(.*)")
     logger(30, "Command: ", command, " value: ", value)
-    local data = json.decode(value)
-    socket_thread.send_data(NET_CLIENT_ID_SOCKET, value)
-    if data then
-        local sent = false
-        local sent_count = 0
-        while not sent and sent_count < config.get_value("MAX_MJC_ATTEMPTS")do
-            local result, headers, response = tcp.http_open_send_close(NET_CLIENT_ID_MJC, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("MJC_PATH"), encapsulated_payload, {}, true);
-            if result and headers["response_code"] == "200" then
-                sent = true
-            else
-                logger(30, "MJC update failed. Result is ", tostring(result), " and response is ", response);
-            end
-            thread.sleep(10000)
-        end
-        if sent == false then
-            logger(30, "All attempts to update failed. Giving up.")
-        end
-    end
+    add_message(value)
 end
 
 local function testing_thread()
-    at.register_command("+MJC", handle_mjc_command, 1)
+    at.register_command("+CARDR", handle_card_read_command, 1)
     while true do
         pcall(at.wait_at_command_thread())
         logger(30, "Wait command function exited. Sleeping before restart")
@@ -456,6 +509,7 @@ local start_threads = function (version)
     local charging_check_thread = thread.create(charging_check)
     local sms_wait_thread = thread.create(start_sms_thread)
     local socket_thread = thread.create(socket_thread_f)
+    local card_reader_send_thread = thread.create(card_reader_send_thread_f)
     logger(10, "GPS tick thread: ", tostring(gps_tick_thread));
     logger(10, "cell_tick_thread: ", tostring(cell_tick_thread));
     logger(10, "Firmware check thread: ", tostring(firmware_check_thread));
@@ -465,6 +519,7 @@ local start_threads = function (version)
     logger(10, "Charging check thread: ", tostring(charging_check_thread))
     logger(10, "SMS wait thread: ", tostring(sms_wait_thread))
     logger(10, "Socket thread: ", tostring(socket_thread))
+    logger(10, "Card reader send thread: ", tostring(card_reader_send_thread))
     local result
     -- thread.sleep(1000);
     logger(10, "Starting threads");
@@ -486,10 +541,14 @@ local start_threads = function (version)
     logger(10, "SMS thread start result is ", tostring(result))
     result = thread.run(socket_thread)
     logger(10, "Socket thread start result is ", tostring(result))
+    result = thread.run(card_reader_send_thread)
+    logger(10, "Card reader send thread start result is ", tostring(result))
+
+
 
     logger(10, "Threads are running");
     local counter = 0
-    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) and thread.running(sms_wait_thread) and thread.running(socket_thread)do
+    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) and thread.running(sms_wait_thread) and thread.running(socket_thread) and thread.running(card_reader_send_thread) do
     --while thread.running(config_update_thread) do
         logger(10, "All threads still running");
         logger(10, "Peak memory used: ", getpeakmem());
@@ -505,6 +564,7 @@ local start_threads = function (version)
             thread.stop(charging_check_thread)
             thread.stop(sms_wait_thread)
             thread.stop(socket_thread)
+            thread.stop(card_reader_send_thread)
             gps.gpsclose()
             break
         end
@@ -528,6 +588,8 @@ local start_threads = function (version)
     logger(30, "Socket thread running: ", thread.running(test_thread));
     logger(30, "SMS wait thread running: ", thread.running(sms_wait_thread));
     logger(30, "Socket thread running: ", thread.running(socket_thread));
+    logger(30, "Card reader send thread running: ", thread.running(card_reader_send_thread));
+
     logger(30, "Loop counter: ", counter);
     thread.sleep(2000)
     at.reset()

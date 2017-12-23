@@ -49,8 +49,8 @@ CONFIG["CHECK_FOR_FIRMWARE_IN_THREADS"] = "true"
 CONFIG["INACTIVITY_REBOOT_TIME"] = 3600
 CONFIG["SHOULD_REBOOT"] = "false"
 CONFIG["SOCK_HEARTBEAT_INTERVAL"] = 60000
-CONFIG["MJC_PATH"] = "/v2/process_mjc"
-CONFIG["MAX_MJC_ATTEMPTS"] = 10
+CONFIG["CARD_READ_PATH"] = "/v1/process_card_read"
+CONFIG["MAX_CARD_READ_ATTEMPTS"] = 10
 
 local client_id = 4
 logger.create_logger("config", 30)
