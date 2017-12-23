@@ -218,7 +218,7 @@ local check_hmac_config = function(config_table)
         logger.log("config", 0, "Checksums are equal")
         return true
     end
-    logger.log("config", 0, "Checksum check failed")
+    logger.log("config", 30, "Checksum check failed")
     return false
 end
 _M.check_hmac_config = check_hmac_config
