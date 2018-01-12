@@ -8,6 +8,8 @@ local util = require("util")
 
 local _M = {}
 
+_M.SOCKET_EVENT = 22
+_M.SOCKET_SEND_READY_EVENT = 37
 local CLIENT_TO_APP_HANDLE = {}
 -- logger.create_logger("tcp_client", 30)
 local logger = logging.create("tcp_client", 30)
@@ -90,59 +92,6 @@ function config_network_common_parameters()
     logger(0, "network.set_dns_timeout_param()=", result);
 end;
 
-local make_http_post = function(host, url, data, headers)
-    logger(0, "Host is ", tostring(host));
-    logger(0, "URL is ", tostring(url));
-    logger(0, "data is ", tostring(data));
-    local http_req = "";
-    local data_length = 0
-    if data ~= nil then
-        data_length = tostring(#data)
-    end
-    http_req = http_req .. "POST " .. tostring(url) .. " ";
-    http_req = http_req .. "HTTP/1.1\r\nHost: ";
-    http_req = http_req .. tostring(host);
-    http_req = http_req .. "\r\n";
-    http_req = http_req .. "User-Agent: SimCom/1.0\r\n" -- (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
-    http_req = http_req .. "Authorization: bc733796ca38178dbee79f68ba4271e97fe170d4\r\n";
-    http_req = http_req .. "Accept: text/html\r\n" -- ,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n";
-    -- http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n";
-    for key, value in pairs(headers) do
-        http_req = http_req .. key .. ": " .. value .. "\r\n"
-    end
-    http_req = http_req .. "Content-Type: application/octet-stream\r\n";
-    http_req = http_req .. "Connection: close\r\n";
-    http_req = http_req .. "Content-Length: " .. data_length .. "\r\n";
-    http_req = http_req .. "\r\n";
-    http_req = http_req .. tostring(data);
-
-    return http_req;
-end
-
-local make_http_post_headers = function(host, url, length, headers)
-    logger(0, "Host is ", tostring(host));
-    logger(0, "URL is ", tostring(url));
-    logger(0, "data is ", tostring(data));
-    local http_req = "";
-    http_req = http_req .. "POST " .. tostring(url) .. " ";
-    http_req = http_req .. "HTTP/1.1\r\nHost: ";
-    http_req = http_req .. tostring(host);
-    http_req = http_req .. "\r\n";
-    http_req = http_req .. "User-Agent: SimCom/1.0\r\n" -- (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
-    http_req = http_req .. "Authorization: bc733796ca38178dbee79f68ba4271e97fe170d4\r\n";
-    http_req = http_req .. "Accept: text/html\r\n" --,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\n";
-    --http_req = http_req .. "Accept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\n";
-    for key, value in pairs(headers) do
-        http_req = http_req .. key .. ": " .. value .. "\r\n"
-    end
-    http_req = http_req .. "Content-Type: application/octet-stream\r\n";
-    http_req = http_req .. "Connection: close\r\n";
-    http_req = http_req .. "Content-Length: " .. length .. "\r\n";
-    http_req = http_req .. "\r\n";
-
-    return http_req;
-end
-
 local open_network = function(client_id)
     --Following is a sample of changing some common parameters, it is not required.
     --config_network_common_parameters();
@@ -221,12 +170,6 @@ end
 
 local connect_host = function(client_id, host, port)
 
-    SOCK_RST_OK = 0
-    SOCK_RST_TIMEOUT = 1
-    SOCK_RST_BUSY = 2
-    SOCK_RST_PARAMETER_WRONG = 3
-    SOCK_RST_SOCK_FAILED = 4
-    SOCK_RST_NETWORK_FAILED = 5
     local result = false;
     local response = ""
 
@@ -262,17 +205,7 @@ local connect_host = function(client_id, host, port)
     local ip_address = network.resolve(host, cid);
     logger(0, "The IP address for ", host, " is ", ip_address);
 
-
-
-    SOCK_TCP = 0;
-    SOCK_UDP = 1;
-
-    SOCK_WRITE_EVENT = 1
-    SOCK_READ_EVENT = 2
-    SOCK_CLOSE_EVENT = 4
-    SOCK_ACCEPT_EVENT = 8
-
-    local socket_fd = socket.create(app_handle, SOCK_TCP);
+    local socket_fd = socket.create(app_handle, _M.SOCK_TCP);
 
     if (not socket_fd or socket_fd < 1) then
         logger(30, "failed to create socket for app handle: ", app_handle, " socket_fd is ", tostring(socket_fd));
@@ -334,7 +267,7 @@ local wait_read_events = function(timeout)
             local evt_sockfd = evt_p2;
             local event_mask = evt_p3;
             for socket, handler in pairs(READ_EVENT_HANDLER) do
-                if ((sock_or_net_event == 1) and (evt_sockfd == socket) and (bit.band(event_mask,SOCK_CLOSE_EVENT) ~= 0)) then
+                if ((sock_or_net_event == 1) and (evt_sockfd == socket) and (bit.band(event_mask, _M.SOCK_CLOSE_EVENT) ~= 0)) then
                     --socket closed by remote side
                     remote_closed = true;
                     logger(0, "waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
@@ -344,14 +277,14 @@ local wait_read_events = function(timeout)
                         logger(0, "1: close socket succeeded");
                     end;
                     return false, remote_closed;
-                elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_READ_EVENT) ~= 0)) then
+                elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask, _M.SOCK_READ_EVENT) ~= 0)) then
                     logger(0, "waited READ event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
                     local err_code, fragment = socket.recv(socket_fd, timeout)
                     if( fragment ) then
                         logger(0, "Fragment is ", fragment)
                         handler(fragment)
                     end
-                    if( err_code == SOCK_CLOSE_EVENT ) then
+                    if( err_code == _M.SOCK_CLOSE_EVENT ) then
                         if (not socket.close(socket_fd)) then
                             logger(30, "2: failed to close socket");
                         else
@@ -369,13 +302,10 @@ end;
 _M.wait_read_events = wait_read_events
 
 local wait_read_event = function(sockfd, timeout)
-    thread.setevtowner(22,22)
-    thread.setevtowner(40,40)
 
-    local SOCKET_EVENT = 22
-    local SOCK_WRITE_EVENT = 1
-    local SOCK_READ_EVENT = 2
-    local SOCK_CLOSE_EVENT = 4
+    thread.setevtowner(_M.SOCKET_EVENT, _M.SOCKET_EVENT)
+    thread.setevtowner(_M.SOCKET_SEND_READY_EVENT, _M.SOCKET_SEND_READY_EVENT)
+
     local remote_closed = false;
     logger(0, "wait_read_event, sockfd=", sockfd, ", timeout=", timeout, "\r\n");
     local start_tick = os.clock();
@@ -385,31 +315,31 @@ local wait_read_event = function(sockfd, timeout)
         if (timeout < 0) then
             timeout = 0;
         end;
-        socket.select(sockfd, SOCK_CLOSE_EVENT);--care for read event, IMPORTANT!!! this will let socket notify READ event.
-        socket.select(sockfd, SOCK_READ_EVENT);--care for read event, IMPORTANT!!! this will let socket notify READ event.
-        socket.deselect(sockfd, SOCK_WRITE_EVENT);--care for read event, IMPORTANT!!! this will let socket notify READ event.
+        socket.select(sockfd, _M.SOCK_CLOSE_EVENT);--care for read event, IMPORTANT!!! this will let socket notify READ event.
+        socket.select(sockfd, _M.SOCK_READ_EVENT);--care for read event, IMPORTANT!!! this will let socket notify READ event.
+        socket.deselect(sockfd, _M.SOCK_WRITE_EVENT);--care for read event, IMPORTANT!!! this will let socket notify READ event.
 
         local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(timeout);
         if (evt and evt >= 0) then
-            logger(30, "waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+            logger(0, "waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
         end;
-        if (evt and evt == SOCKET_EVENT) then
+        if (evt and evt == _M.SOCKET_EVENT) then
             logger(0, "Event is a socket event\r\n")
             local sock_or_net_event = evt_p1;--0=>network event, usually ("LOST NETWORK"); 1=>socket event.
             local evt_sockfd = evt_p2;
             local event_mask = evt_p3;
-            if ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_CLOSE_EVENT) ~= 0)) then
+            if ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask, _M.SOCK_CLOSE_EVENT) ~= 0)) then
                 --socket closed by remote side
                 logger(30, "Socket closed by remote side\r\n")
                 logger(0, "waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
                 return true, false, true;
-            elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask,SOCK_READ_EVENT) ~= 0)) then
+            elseif ((sock_or_net_event == 1) and (evt_sockfd == sockfd) and (bit.band(event_mask, _M.SOCK_READ_EVENT) ~= 0)) then
                 logger(0, "waited READ event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
                 return true, false, false;
             else
                 logger(0, "Not socket read or close event\r\n")
             end;
-        elseif evt and evt == 40 and evt_p1 and evt_p1 == sockfd then
+        elseif evt and evt == _M.SOCKET_SEND_READY_EVENT and evt_p1 and evt_p1 == sockfd then
             return false, true, false
         end;
         local cur_tick = os.clock();
@@ -432,12 +362,6 @@ when they happen, the socket cannot be used to transfer data further.
 ]]
 local send_data = function(client_id, host, port, ...)
 
-    SOCK_RST_OK = 0
-    SOCK_RST_TIMEOUT = 1
-    SOCK_RST_BUSY = 2
-    SOCK_RST_PARAMETER_WRONG = 3
-    SOCK_RST_SOCK_FAILED = 4
-    SOCK_RST_NETWORK_FAILED = 5
     local result = false;
     local response = ""
 
@@ -473,17 +397,7 @@ local send_data = function(client_id, host, port, ...)
     local ip_address = network.resolve(host, cid);
     logger(0, "The IP address for ", host, " is ", ip_address);
 
-
-
-    SOCK_TCP = 0;
-    SOCK_UDP = 1;
-
-    SOCK_WRITE_EVENT = 1
-    SOCK_READ_EVENT = 2
-    SOCK_CLOSE_EVENT = 4
-    SOCK_ACCEPT_EVENT = 8
-
-    local socket_fd = socket.create(app_handle, SOCK_TCP);
+    local socket_fd = socket.create(app_handle, _M.SOCK_TCP);
 
     if (not socket_fd or socket_fd < 1) then
         logger(30, "failed to create socket for app handle: ", app_handle, " socket_fd is ", tostring(socket_fd));
@@ -506,8 +420,8 @@ local send_data = function(client_id, host, port, ...)
             logger(30, "failed to connect server");
         else
             logger(0, "connect server succeeded");
-            socket.select(socket_fd, SOCK_CLOSE_EVENT);--care for close event
-            -- local http_req = "POST /process_update HTTP/1.1\r\nHost: www.scattym.com\r\nUser-Agent: Mozilla/5.0 (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: zh-cn,zh;q=0.5\r\nAccept-Encoding: gzip, deflate\r\nAccept-Charset: GB2312,utf-8;q=0.7,*;q=0.7\r\nKeep-Alive: 115\r\nConnection: keep-alive\r\n\r\n";
+            socket.select(socket_fd, _M.SOCK_CLOSE_EVENT);--care for close event
+
             local timeout = 30000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
             local total_length = 0
             local total_sent_length = 0
@@ -524,12 +438,12 @@ local send_data = function(client_id, host, port, ...)
                 logger(30, "Not all data sent. err_code:", err_code, ", sent_len:", total_sent_length, ", data length:", #total_length);
             end
             logger(0, "socket.send ", err_code, ", ", total_sent_length);
-            local http_resp = ""
-            if (err_code and (err_code == SOCK_RST_OK)) then
+
+            if (err_code and (err_code == _M.SOCK_RST_OK)) then
                 logger(0, "socket.recv()...");
                 local timeout = 15000;--  '< 0' means wait for ever; '0' means not wait; '> 0' is the timeout milliseconds
 
-                while( err_code == 0 ) do -- ~= SOCK_CLOSE_EVENT ) do
+                while( err_code == 0 ) do -- ~= _M.SOCK_CLOSE_EVENT ) do
                     logger(0, "Error code is ", err_code)
                     local fragment = ""
                     err_code, fragment = socket.recv(socket_fd, timeout);
@@ -544,7 +458,7 @@ local send_data = function(client_id, host, port, ...)
                     result = true;
                 end
             else
-                logger(30, "Error code is not as expected. err_code: ", err_code, " expecting: ", SOCK_RST_OK)
+                logger(30, "Error code is not as expected. err_code: ", err_code, " expecting: ", _M.SOCK_RST_OK)
             end;
         end;
         logger(0, "closing socket...");
@@ -605,124 +519,5 @@ end;
 
 _M.open_send_close_tcp = open_send_close_tcp;
 
--- HTTP/1.0 500 INTERNAL SERVER ERROR
--- HTTP/1.0 200 OK
-local parse_http_headers = function(response)
-    local headers = {}
-    headers["response_code"] = "000"
-    if not response then
-        logger(30, "Did not get a header string to parse. Response is nil.")
-    else
-        for line in response:gmatch("([^\r\n]*)\r\n?") do
-            logger(0, "Line is ", line)
-
-            local type, code, msg = line:match("([Hh][Tt][Tt][Pp]/[0-9].[0-9])%s+([0-9]*)%s+(.*)")
-            if( type and code and msg ) then
-                logger(0, "Type: ", type, " code: ", code, " msg: ", msg)
-                headers["response_code"] = code
-            else
-                for key, value in line:gmatch("(%S*):%s*(.*)") do
-                    logger(0, "key is ", key, " value is ", value)
-                    if( key and value ) then
-                        headers[key] = value
-                    end
-
-                end
-            end
-        end
-    end
-    logger(0, "Finished parsing headers")
-    collectgarbage()
-    return headers
-end
-
-local function TotalLength(HeaderLength, ContentLength)
-   return HeaderLength + ContentLength
-end
-
--- Assume that Buff holds buffer to receive socket data
-local parse_http_response = function (buffer)
-    local payload = ""
-    local _, HeaderLength = buffer:find('\r\n\r\n')
-    local ContentLength = buffer:match("Content%-Length:%s(%d+)\r\n")
-    if (not ContentLength or not HeaderLength) then
-        logger(30, 'Badly formed HTTP response.'..buffer)
-        return {}, ""
-    end
-    local ExpectedLength = TotalLength(HeaderLength, ContentLength)
-    if (#buffer < ExpectedLength) then
-        logger(30, "Bad content length field. Expected: ", ExpectedLength, " but got", #buffer)
-        return {}, ""
-    end
-
-
-    logger(0, "Preparing header buffer")
-    local header_buf = buffer:sub(1, HeaderLength)
-    logger(0, "Parsing headers")
-    local headers = parse_http_headers(header_buf)
-    logger(0, "Extracting payload")
-    payload = buffer:sub(HeaderLength+1, HeaderLength+ContentLength)
-    --logger(0, "Payload is >", payload, "<\r\n")
-    collectgarbage()
-    return headers, payload
-end
-
-
-local http_open_send_close = function(client_id, host, port, url, data, headers, encrypt)
-    if data == nil then
-        data = ""
-    end
-    if not headers then
-        headers = {}
-    end
-    if type(encrypt) == "boolean" and encrypt == true then
-        headers["encrypted"] = "true"
-    end
-    if type(encrypt) == "table" and encrypt["key"] ~= nil and encrypt["enc_key"] ~= nil then
-        headers["iv"] = rsa.num_to_hex(encrypt["iv"])
-        headers["sk"] = rsa.num_to_hex(encrypt["enc_key"])
-        headers["encrypted"] = "true"
-    end
-
-    local payload = ""
-    if encrypt ~= false and data ~= nil and data ~= "" then
-
-        logger(0, "About to encrypt payload: ", data);
-        collectgarbage()
-        payload = aeslib.encrypt("password", data, aeslib.AES128, aeslib.CBCMODE)
-        logger(0, "Encrypted payload is ", util.tohex(payload));
-        logger(10, "Encrypted payload length is ", #payload);
-        collectgarbage()
-
-    else
-
-        payload = data
-        logger(0, "Not encrypting ", tostring(payload));
-
-    end
-    local payload_length = 0
-    if payload ~= nil then
-        payload_length = #payload
-    end
-
-    if( not client_id ) then
-        logger(30, "Invalid client id: ", client_id);
-    else
-        logger(20, "Callout to http://", host, ":", port, url)
-        logger(20, "Length is ", payload_length)
-        local http_preamble = make_http_post_headers(host, url, payload_length, headers)
-        local result, response = send_data(client_id, host, port, http_preamble, payload)
-        logger(10, "Response is ", response)
-        if( result and response ) then
-            local headers, response_payload = parse_http_response(response);
-            collectgarbage();
-            return result, headers, response_payload;
-        end
-    end;
-    collectgarbage();
-    return false, "", "";
-end;
-
-_M.http_open_send_close = http_open_send_close;
 
 return _M

@@ -8,13 +8,14 @@
 
 local _M = {}
 
-local tcp = require("tcp_client")
+local http_lib = require("http_lib")
 local unzip = require("unzip")
 local at = require("at_commands")
 local json = require("json")
 local logger = require("logging")
 local config = require("config")
 local client_id = 3
+local NET_CLIENT_ID_FIRMWARE = config.get_config_value("NET_CLIENT_ID_FIRMWARE")
 
 local function tohex(data)
     return (data:gsub(".", function (x)
@@ -26,10 +27,10 @@ logger.create_logger("firmware", 30)
 
 function get_firmware(imei, version)
     local fn_result = false
-    --local open_net_result = tcp.open_network(client_id);
-    --logger.log("firmware", 10, "Open network response is: ", open_net_result);
+
     collectgarbage()
-    local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("FIRMWARE_HOST"), config.get_config_value("UPDATE_PORT"), "/get_firmware?ident=imei:" .. imei, "");
+
+    local result, headers, response = http_lib.http_connect_send_close(NET_CLIENT_ID_FIRMWARE, config.get_config_value("FIRMWARE_HOST"), config.get_config_value("UPDATE_PORT"), "/get_firmware?ident=imei:" .. imei, "");
     collectgarbage()
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 30, "Callout for firmware failed. Result was: ", result, " and response code: ", headers["response_code"])
@@ -37,7 +38,7 @@ function get_firmware(imei, version)
         logger.log("firmware", 10, "Response length is ", #response)
         local firmware_json = json.decode(response);
         collectgarbage()
-        -- tcp.close_network(client_id);
+
         logger.log("firmware", 10, firmware_json);
         if not firmware_json then
             logger.log("firmware", 30, "Unable to load firmware json")
@@ -80,10 +81,9 @@ function get_firmware(imei, version)
 end
 
 local check_firmware_and_maybe_update = function(imei, current_version)
-    --local open_net_result = tcp.open_network(client_id);
-    logger.log("firmware", 10, "Open network response is: ", open_net_result, "\r\n");
-    local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("FIRMWARE_HOST"), 65535, "/get_firmware_version?ident=imei:" .. imei, "");
-    --tcp.close_network(client_id);
+
+    local result, headers, response = http_lib.http_connect_send_close(NET_CLIENT_ID_FIRMWARE, config.get_config_value("FIRMWARE_HOST"), 65535, "/get_firmware_version?ident=imei:" .. imei, "");
+
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 30, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
     else
@@ -127,10 +127,9 @@ _M.check_firmware_and_maybe_update = check_firmware_and_maybe_update
 
 
 local check_firmware_and_maybe_reset = function(imei, current_version)
-    --local open_net_result = tcp.open_network(client_id);
-    logger.log("firmware", 10, "Open network response is: ", open_net_result, "\r\n");
-    local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("FIRMWARE_HOST"), 65535, "/get_firmware_version?ident=imei:" .. imei, "");
-    --tcp.close_network(client_id);
+
+    local result, headers, response = http_lib.http_connect_send_close(NET_CLIENT_ID_FIRMWARE, config.get_config_value("FIRMWARE_HOST"), 65535, "/get_firmware_version?ident=imei:" .. imei, "");
+
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 30, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
     else

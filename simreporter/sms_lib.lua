@@ -58,7 +58,7 @@ local send_message_to_number = function(message, number)
     sms.set_csmp(17, 14, 0, 0);
     sms.set_cmgf(1);
     local suc, msg_ref_or_err_cause = sms.send(number, message);--send single sms, default is "UNSENT"
-    print("sms.send=", suc, ",", msg_ref_or_err_cause, "\r\n");
+    logger(30, "sms.send=", suc, ",", msg_ref_or_err_cause);
 end
 
 
@@ -70,11 +70,11 @@ local wait_for_sms_thread = function(imei)
     local sms_ready = false
     while not sms_ready do
         sms_ready = sms.ready();
-        print("sms.ready() = ", sms_ready, "\r\n");
+        logger(30, "sms.ready() = ", sms_ready);
         if (not sms_ready) then
-          print("SMS not ready now\r\n");
+          logger(30, "SMS not ready now");
         end;
-        print("Sleeping")
+        logger(0, "Sleeping")
         thread.sleep(10000)
     end
 
@@ -85,23 +85,23 @@ local wait_for_sms_thread = function(imei)
     while (true) do
         local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(150000);
         if (evt ~= -1) then
-            print("waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock, "\r\n");
+            logger(0, "waited event, ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock);
         end;
         if (evt and evt == SMS_EVENT_ID) then
             local rpt_type = evt_p1;
             local storage = evt_p2;
             local index = evt_p3;
             if (rpt_type == SMS_EVT_P1_CMTI) then
-                print("Got CMTI:", ", storage=", storage, ", index=", index, "\r\n");
+                logger(30, "Got CMTI:", ", storage=", storage, ", index=", index);
             elseif (rpt_type == SMS_EVT_P1_CDSI) then
-                print("Got CDSI:", ", storage=", storage, ", index=", index, "\r\n");
+                logger(30, "Got CDSI:", ", storage=", storage, ", index=", index);
             end;
             local rst, sms_content = sms.read(index);--just read, without modify the tag from "UNREAD" to "READ"
-            print("sms.read[", msg_index, "]=", rst, "\r\n");
+            logger(30, "sms.read[", msg_index, "]=", rst);
             if (not sms_content) then
-                print("sms_content is nil\r\n");
+                logger(30, "sms_content is nil");
             else
-                print("TEXT sms_content=\r\n", sms_content, "\r\n");
+                logger(30, "TEXT sms_content=", sms_content);
                 local message = parse_sms_message(sms_content)
                 sms.delete(index)
                 if message then

@@ -44,7 +44,7 @@ local send_data = function(client_id, data)
     if data then
         BUFFER = data
         if CLIENT_TO_SOCKET[client_id] then
-            setevt(40, CLIENT_TO_SOCKET[client_id])
+            setevt(tcp.SOCKET_SEND_READY_EVENT, CLIENT_TO_SOCKET[client_id])
         end
     end
 end

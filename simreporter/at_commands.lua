@@ -236,9 +236,14 @@ _M.register_command = register_command
 
 local wait_at_command_thread = function()
     thread.setevtowner(_M.AT_CTL_EVENT, _M.AT_CTL_EVENT)
+
+    -- thread.addevtfilter(100, true, _M.AT_CTL_EVENT)
     while true do
+
         local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(9999999)
         if(evt == _M.AT_CTL_EVENT) then
+            -- thread.clearevts()
+
             local cmd_port, cmd_name, cmd_op, cmd_line, cmd_status = atctl.atcget()
             if CMD_CALLBACKS[cmd_name] then
                 CMD_CALLBACKS[cmd_name](cmd_port, cmd_name, cmd_op, cmd_line, cmd_status)
@@ -252,5 +257,11 @@ local wait_at_command_thread = function()
     end
 end
 _M.wait_at_command_thread = wait_at_command_thread
+
+local enable_time_updates = function()
+    response = run_command("AT+CTZU=1");
+    return response;
+end;
+_M.enable_time_updates = enable_time_updates
 
 return _M

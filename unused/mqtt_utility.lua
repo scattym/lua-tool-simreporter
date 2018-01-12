@@ -1,3 +1,11 @@
+--
+-- Created by IntelliJ IDEA.
+-- User: matt
+-- Date: 28/10/17
+-- Time: 2:27 PM
+-- To change this template use File | Settings | File Templates.
+--
+
 -- utility.lua
 -- ~~~~~~~~~~~
 -- Please do not remove the following notices.
@@ -16,18 +24,16 @@
 -- - shift_left() should mask bits past the 8, 16, 32 and 64-bit boundaries.
 -- ------------------------------------------------------------------------- --
 
-local function isPsp() return(Socket ~= nil) end
-
-if (isPsp()) then socket = Socket end                        -- Compatibility !
-
 -- ------------------------------------------------------------------------- --
+local logging = require("logging")
+local logger = logging.create("mqtt_library", 30)
 
 local debug_flag = false
 
 local function set_debug(value) debug_flag = value end
 
 local function debug(message)
-  if (debug_flag) then print(message) end
+  if (debug_flag) then logger(30, message) end
 end
 
 -- ------------------------------------------------------------------------- --
@@ -36,7 +42,7 @@ local function dump_string(value)
   local index
 
   for index = 1, string.len(value) do
-    print(string.format("%d: %02x", index, string.byte(value, index)))
+    logger(30, string.format("%d: %02x", index, string.byte(value, index)))
   end
 end
 
@@ -44,17 +50,8 @@ end
 
 local timer
 
-if (isPsp()) then
-  timer = Timer.new()
-  timer:start()
-end
-
 local function get_time()
-  if (isPsp()) then
-    return(timer:time() / 1000)
-  else
-    return(socket.gettime())
-  end
+    return os.clock()
 end
 
 local function expired(last_time, duration, type)
@@ -72,47 +69,6 @@ end
 
 local function shift_right(value, shift)
   return(math.floor(value / 2 ^ shift))
-end
-
--- ------------------------------------------------------------------------- --
-
-local function socket_ready(socket_client)
-  local ready, read_sockets, write_sockets, error_state = true, nil, nil, nil
-
-  if (not isPsp()) then
-    read_sockets, write_sockets, error_state =
-      socket.select({socket_client}, nil, 0.001)
-
-    if (#read_sockets == 0) then ready = false end
-  end
-
-  return(ready)
-end
-
-local function socket_receive(socket_client, byte_count)
-  local response, buffer, error_message = nil, nil, nil
-
-  byte_count = byte_count or 128                                     -- default
-
-  if (isPsp()) then
-    buffer = socket_client:recv(byte_count)
-  else
-    response, error_message, buffer = socket_client:receive("*a")
-
-    if (error_message == "timeout") then error_message = nil end
-  end
-
-  return(error_message), (buffer)                            -- nil or "closed"
-end
-
-local function socket_wait_connected(socket_client)
-  if (isPsp()) then
-    while (socket_client:isConnected() == false) do
-      System.sleep(100)
-    end
-  else
-    socket_client:settimeout(0.001)     -- So that socket.recieve doesn't block
-  end
 end
 
 -- ------------------------------------------------------------------------- --
@@ -144,7 +100,6 @@ end
 
 local Utility = {}
 
-Utility.isPsp = isPsp
 Utility.set_debug = set_debug
 Utility.debug = debug
 Utility.dump_string = dump_string
@@ -152,9 +107,6 @@ Utility.get_time = get_time
 Utility.expired = expired
 Utility.shift_left = shift_left
 Utility.shift_right = shift_right
-Utility.socket_ready = socket_ready
-Utility.socket_receive = socket_receive
-Utility.socket_wait_connected = socket_wait_connected
 Utility.table_to_string = table_to_string
 
 -- For ... Utility = require("utility")
@@ -162,3 +114,4 @@ Utility.table_to_string = table_to_string
 return(Utility)
 
 -- ------------------------------------------------------------------------- --
+

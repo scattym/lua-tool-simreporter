@@ -1,8 +1,9 @@
 local _M = {}
 
-json = require("json")
-logger = require("logging")
-tcp = require("tcp_client")
+local json = require("json")
+local logger = require("logging")
+local tcp = require("tcp_client")
+local http_lib = require("http_lib")
 
 local CONFIG ={}
 -- Time to sleep between successive nmea reports
@@ -13,7 +14,7 @@ CONFIG["REPORT_INTERVAL"] = 30000
 CONFIG["NMEA_LOOP_COUNT"] = 100
 CONFIG["MAIN_THREAD_SLEEP"] = 60000
 -- Number of times to run main thread before exiting, set to 0 for infinite
-CONFIG["MAX_MAIN_THREAD_LOOP_COUNT"] = 5
+CONFIG["MAX_MAIN_THREAD_LOOP_COUNT"] = 6
 CONFIG["GPS_LOCK_CHECK_SLEEP_TIME"] = 20000
 CONFIG["GPS_LOCK_CHECK_MAX_LOOP"] = 50
 CONFIG["FIRMWARE_SLEEP_TIME"] = 60000
@@ -21,11 +22,11 @@ CONFIG["CELL_THREAD_SLEEP_TIME"] = 30000
 CONFIG["GPS_THREAD_SLEEP_TIME"] = 30000
 CONFIG["MIN_REPORT_TIME"] = 60
 CONFIG["FIRMWARE_HOST"] = "firmware.scattym.com"
-CONFIG["UPDATE_HOST"] = "services.do.scattym.com"
+CONFIG["UPDATE_HOST"] = "services.scattym.com"
 CONFIG["UPDATE_PORT"] = 65535
-CONFIG["MQ_HOST"] = "services.do.scattym.com"
+CONFIG["MQ_HOST"] = "services.scattym.com"
 CONFIG["MQ_PORT"] = 65534
-CONFIG["SOCK_HOST"] = "services.do.scattym.com"
+CONFIG["SOCK_HOST"] = "services.scattym.com"
 CONFIG["SOCK_PORT"] = 65533
 CONFIG["CELL_PATH"] = "/v2/process_cell_update"
 CONFIG["GPS_PATH"] = "/v2/process_update"
@@ -37,7 +38,7 @@ CONFIG["MAX_FAILURE_COUNT"] = 5
 CONFIG["MAX_VOLT_DROP_COUNT"] = 5
 CONFIG["MAX_VOLT_GAIN_COUNT"] = 2
 CONFIG["MIN_BAT_PERCENT_FOR_GPS"] = 10
-CONFIG["MAX_BAT_PERCENT_CHARGE_CHECK"] = 90
+CONFIG["MAX_BAT_PERCENT_CHARGE_CHECK"] = 86
 CONFIG["CHARGING_CHECK_THREAD_SLEEP_TIME"] = 15000
 CONFIG["CHECK_FOR_CHARGING"] = "true"
 CONFIG["MIN_BAT_PERCENT_FOR_BOOT"] = 12
@@ -50,7 +51,30 @@ CONFIG["INACTIVITY_REBOOT_TIME"] = 3600
 CONFIG["SHOULD_REBOOT"] = "false"
 CONFIG["SOCK_HEARTBEAT_INTERVAL"] = 60000
 CONFIG["CARD_READ_PATH"] = "/v1/process_card_read"
-CONFIG["MAX_CARD_READ_ATTEMPTS"] = 10
+CONFIG["MAX_CARD_READ_SEND_ATTEMPTS"] = 3
+CONFIG["MAX_HTTP_REPORTER_SEND_ATTEMPTS"] = 3
+CONFIG["MAX_HTTP_REPORTER_PAYLOAD_ATTEMPTS"] = 100
+CONFIG["MAX_CONFIG_ON_BOOT_CALLOUTS"] = 5
+
+
+-------- global vars --------
+CONFIG["NET_CLIENT_ID_GPS"] = 1
+CONFIG["NET_CLIENT_ID_FIRMWARE"] = 3
+CONFIG["NET_CLIENT_ID_CARD"] = 5
+CONFIG["NET_CLIENT_ID_SOCKET"] = 8
+CONFIG["NET_CLIENT_ID_HTTP_SYNC"] = 9
+CONFIG["NET_CLIENT_ID_HTTP_REPORTER"] = 10
+
+CONFIG["CRITICAL_SECTION_CELL"] = 2
+CONFIG["CRITICAL_SECTION_CHARGING_CHECK"] = 6
+CONFIG["CRITICAL_SECTION_GPS"] = 7
+CONFIG["CRITICAL_SECTION_REPORTER"] = 8
+CONFIG["CRITICAL_SECTION_HTTP_REPORTER"] = 9
+
+CONFIG["WAIT_EVENT_SOCKET_SEND"] = 40
+CONFIG["WAIT_EVENT_MESSAGE_QUEUE"] = 39
+
+
 
 local client_id = 4
 logger.create_logger("config", 30)
@@ -83,7 +107,7 @@ local MUST_BE_INTS = {
     "GPS_THREAD_SLEEP_TIME",
     "INACTIVITY_REBOOT_TIME",
     "SOCK_HEARTBEAT_INTERVAL",
-    "MAX_MJC_ATTEMPTS",
+    "MAX_CARD_READ_SEND_ATTEMPTS",
 }
 
 local MUST_BE_STRING = {
@@ -101,7 +125,7 @@ local MUST_BE_STRING = {
     "ENABLE_TCP",
     "CHECK_FOR_CHARGING",
     "SHOULD_REBOOT",
-    "MJC_PATH",
+    "CARD_READ_PATH",
 }
 
 local MUST_BE_BOOLEAN = {
@@ -280,9 +304,8 @@ _M.load_config_from_file = load_config_from_file
 
 local load_config_from_server = function(imei, version)
     local fn_result = false
-    --local open_net_result = tcp.open_network(client_id);
-    --logger.log("config", 0, "Open network response is: ", open_net_result);
-    local result, headers, response = tcp.http_open_send_close(client_id, get_config_value("UPDATE_HOST"), get_config_value("UPDATE_PORT"), "/get_config?ident=imei:" .. imei .. "&version=" .. version .. "&type=5300");
+
+    local result, headers, response = http_lib.synchronous_http_get(get_config_value("NET_CLIENT_ID_HTTP_SYNC"), get_config_value("UPDATE_HOST"), get_config_value("UPDATE_PORT"), "/get_config?ident=imei:" .. imei .. "&version=" .. version .. "&type=5300", {})
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("config", 30, "Callout for config failed. Result was: ", result, " and response code: ", headers["response_code"])
     else

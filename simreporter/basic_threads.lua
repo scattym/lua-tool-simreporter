@@ -13,11 +13,10 @@ local logging = require("logging")
 local keygen = require("keygen")
 local rsa = require("rsa_lib")
 local network_setup = require("network_setup")
-local aes = require("aes")
-local out_command = require("out_command")
-local mqtt_thread = require("mqtt_thread")
 local socket_thread = require("socket_thread")
 local sms_lib = require("sms_lib")
+local system = require("system")
+local http_reporter = require("http_reporter")
 
 local logger = logging.create("basic_threads", 30)
 
@@ -41,7 +40,9 @@ local CRITICAL_SECTION_GPS = 7
 local CRITICAL_SECTION_REPORTER = 8
 
 local WAIT_EVENT_SOCKET_SEND = 40
-local WAIT_EVENT_MESSAGE_QUEUE = 41
+local WAIT_EVENT_MESSAGE_QUEUE = 39
+
+local card_reader_send_thread
 
 local function tohex(data)
     return (data:gsub(".", function (x)
@@ -234,12 +235,16 @@ local function gps_tick()
                         cell_table["running_version"] = tostring(running_version)
 
                         local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
-
-                        local result, headers, payload = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, true);
-                        if result and headers["response_code"] == "200" then
-                            update_last_cell_report();
-                        end;
-                        logger(10, "Result is ", tostring(result));
+                        http_reporter.add_message(
+                            nil,
+                            encapsulated_payload,
+                            {},
+                            config.get_config_value("UPDATE_HOST"),
+                            config.get_config_value("UPDATE_PORT"),
+                            config.get_config_value("CELL_PATH"),
+                            true
+                        )
+                        update_last_cell_report();
                     end
 
                     local nmea_data = nmea.getinfo(511);
@@ -251,20 +256,15 @@ local function gps_tick()
                             nmea_table["cell_info"] = at.get_cell_info()
                         end
                         local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
-
-                        local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("GPS_PATH"), encapsulated_payload, {}, true);
-                        if result and headers["response_code"] == "200" then
-                            failure_count = 0
-                        else
-                            logger(30, "GPS update failed. Result is ", tostring(result), " and response is ", response);
-                            failure_count = failure_count + 1
-                            if failure_count > config.get_config_value("MAX_FAILURE_COUNT") then
-                                logger(30, "Max failure count reached. Resetting device.");
-                                at.reset()
-                            end
-                        end
-                        logger(10, "Result is ", tostring(result), " and response is ", response);
-
+                        http_reporter.add_message(
+                            nil,
+                            encapsulated_payload,
+                            {},
+                            config.get_config_value("UPDATE_HOST"),
+                            config.get_config_value("UPDATE_PORT"),
+                            config.get_config_value("GPS_PATH"),
+                            true
+                        )
                     end;
                     collectgarbage();
                     update_last_gps_report() -- Update regardless of result as we want one try only
@@ -287,41 +287,31 @@ end;
 
 local function cell_tick()
     logger(10, "Starting cell data tick function");
-    local client_id = 2;
-    logger(30, "Enc start, clock is: ", tostring(os.clock()))
 
     local key_data = true
     local failure_count = 0
 
     while (true) do
         logger(10, "Cell data thread waking up");
-
         if last_cell_report_has_expired() then
             --key_data["iv"] = rsa.bytes_to_num(keygen.create_key(128))
-            --tcp.open_network(client_id);
             for i=1,1 do
                 local cell_table = device.get_device_info_table()
                 cell_table["extra_info"] = EXTRA_INFO
                 cell_table["running_version"] = tostring(running_version)
                 --cell_table["key"] = rsa.num_to_hex(key)
-                local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, i, config.get_config_value("NMEA_LOOP_COUNT"));
-                local result, headers, response = tcp.http_open_send_close(client_id, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CELL_PATH"), encapsulated_payload, {}, key_data)
-                logger(10, "Result is ", tostring(result), " and response is ", response);
-                if result and headers["response_code"] == "200" then
-                    failure_count = 0
-                    update_last_cell_report();
-                else
-                    logger(30, "Cell update failed. Result is ", tostring(result), " and response is ", response);
-                    failure_count = failure_count + 1
-                    if failure_count > config.get_config_value("MAX_FAILURE_COUNT") then
-                        logger(30, "Max failure count reached. Resetting device.");
-                        at.reset()
-                    end
-                end;
-                collectgarbage();
-                thread.sleep(config.get_config_value("NMEA_SLEEP_TIME"));
-            end;
-            --tcp.close_network(client_id);
+                local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, 1, 1)
+                -- message, headers, host, port, path, encrypt
+                http_reporter.add_message(
+                    nil,
+                    encapsulated_payload,
+                    {},
+                    config.get_config_value("UPDATE_HOST"),
+                    config.get_config_value("UPDATE_PORT"),
+                    config.get_config_value("CELL_PATH"),
+                    key_data
+                )
+            end
         else
             logger(10, "Cell data has already been reported at ", tostring(last_cell_report));
         end
@@ -369,78 +359,7 @@ local parse_json_command = function(json_str)
     end
 end
 
-local function process_out_cmd()
-    local callback_table = {}
-    callback_table[out_command.MESSAGE_TYPE_JSON] = parse_json_command
-    out_command.wait_and_parse_loop(callback_table)
-end
-
-local MESSAGE_QUEUE = {}
-local function add_message(message, osclock)
-    local data = {}
-    if osclock then
-        data["osclock"] = osclock
-    else
-        data["osclock"] = system.get_up_time()
-    end
-    data["message"] = message
-    thread.enter_cs(CRITICAL_SECTION_REPORTER)
-    table.insert(MESSAGE_QUEUE, data)
-    thread.leave_cs(CRITICAL_SECTION_REPORTER)
-    setevt(WAIT_EVENT_MESSAGE_QUEUE)
-end
-local function get_message()
-    local return_val
-    if #MESSAGE_QUEUE > 0 then
-        thread.enter_cs(CRITICAL_SECTION_REPORTER)
-        return_val = MESSAGE_QUEUE[1]
-        table.remove(MESSAGE_QUEUE, 1)
-        thread.leave_cs(CRITICAL_SECTION_REPORTER)
-    end
-    return return_val
-end
-local function queue_length()
-    local return_val = 0
-    thread.enter_cs(CRITICAL_SECTION_REPORTER)
-    return_val = #MESSAGE_QUEUE
-    thread.leave_cs(CRITICAL_SECTION_REPORTER)
-    return return_val
-end
-
-local function card_reader_send_thread_f()
-    thread.setevtowner(WAIT_EVENT_MESSAGE_QUEUE, WAIT_EVENT_MESSAGE_QUEUE)
-
-    local key_data = true
-
-    while true do
-        local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(100000)
-        if (evt and evt >= 0) then
-            local failure_count = 0
-            logger(0, "waited evt: ", evt, ", ", evt_p1, ", ", evt_p2, ", ", evt_p2, ", ", evt_clock)
-            while queue_length() > 0 and failure_count < config.get_value("MAX_CARD_ATTEMPTS") do
-                local data = get_message()
-                if data and data["osclock"] and data["message"] then
-                    data["age"] = data["osclock"] - system.get_up_time()
-                    local encapsulated_payload = encaps.encapsulate_data(ati_string, data, 0, 0)
-                    local result, headers, response = tcp.http_open_send_close(NET_CLIENT_ID_MESSAGE_QUEUE, config.get_config_value("UPDATE_HOST"), config.get_config_value("UPDATE_PORT"), config.get_config_value("CARD_READ_PATH"), encapsulated_payload, {}, key_data)
-                    logger(10, "Result is ", tostring(result), " and response is ", response)
-                    if result and headers["response_code"] == "200" then
-                        logger(0, "Card data was sent.")
-                    else
-                        logger(30, "Card data update failed. Result is ", tostring(result), " and response is ", response)
-                        failure_count = failure_count + 1
-                        add_message(data["message"], data["osclock"])
-                    end
-                    collectgarbage();
-                else
-                    logger(30, "Data to send but no data returned. Oboject is: ", data)
-                    failure_count = failure_count + 1
-                end
-            end
-        end
-    end
-end
-
+-- AT+CARDR=test
 local function handle_card_read_command(cmd_port, cmd_name, cmd_op, cmd_line, cmd_status)
     logger(30, "Got a card read command")
     logger(30, cmd_port)
@@ -450,13 +369,25 @@ local function handle_card_read_command(cmd_port, cmd_name, cmd_op, cmd_line, cm
     logger(30, cmd_status)
     local command, value = cmd_line:match("([^=]+)=(.*)")
     logger(30, "Command: ", command, " value: ", value)
-    add_message(value)
+    -- add_message(value)
+    local data = {}
+    data["card_read"] = value
+    local encapsulated_payload = encaps.encapsulate_data(ati_string, data, 0, 0)
+    http_reporter.add_message(
+        nil,
+        encapsulated_payload,
+        {},
+        config.get_config_value("UPDATE_HOST"),
+        config.get_config_value("UPDATE_PORT"),
+        config.get_config_value("CARD_READ_PATH"),
+        true
+    )
 end
 
 local function testing_thread()
     at.register_command("+CARDR", handle_card_read_command, 1)
     while true do
-        pcall(at.wait_at_command_thread())
+        pcall(at.wait_at_command_thread)
         logger(30, "Wait command function exited. Sleeping before restart")
         thread.sleep(10000)
     end
@@ -464,7 +395,7 @@ end
 
 local function socket_thread_f()
     while true do
-        pcall(socket_thread.socket_thread(NET_CLIENT_ID_SOCKET, imei, running_version))
+        pcall(socket_thread.socket_thread, NET_CLIENT_ID_SOCKET, imei, running_version)
         logger(30, "Socket function exited. Sleeping before restart")
         thread.sleep(10000)
     end
@@ -473,7 +404,7 @@ end
 local function start_sms_thread()
 
     while true do
-        pcall(sms_lib.wait_for_sms_thread(imei))
+        pcall(sms_lib.wait_for_sms_thread, imei)
         logger(30, "SMS function exitied. Sleeping before restart")
         thread.sleep(10000)
     end
@@ -489,17 +420,36 @@ local function get_battery_percent()
     return battery_percent
 end
 
+local function device_setup()
+    local response = at.enable_time_updates()
+    network_setup.set_network_from_sms_operator();
+end
+
+
 local start_threads = function (version)
     running_version = version;
 
     while get_battery_percent() < config.get_config_value("MIN_BAT_PERCENT_FOR_BOOT") do
         logger(30, "Battery level too low not starting threads.");
-        vmsleep(10000)
+        vmsleep(30000)
     end
 
-    network_setup.set_network_from_sms_operator();
+    device_setup()
     vmsleep(2000);
-    local config_result = config.load_config_from_server(imei, running_version)
+    local config_attempts = 0
+    local config_loaded = false
+    while not config_loaded and config_attempts < config.get_config_value("MAX_CONFIG_ON_BOOT_CALLOUTS") do
+        config_attempts = config_attempts + 1
+        config_loaded = config.load_config_from_server(imei, running_version)
+        if not config_loaded then
+            logger(30, "Callout for config failed. Sleeping for 3 seconds before retrying.")
+            vmsleep(3000)
+        end
+    end
+    if config_loaded == false then
+        logger(30, "Attempt to load config on boot failed. Giving up and continuing")
+    end
+
     if config.get_config_value("CHECK_FOR_FIRMWARE_ON_BOOT") == "true" then
         firmware.check_firmware_and_maybe_update(imei, running_version)
     end
@@ -509,22 +459,19 @@ local start_threads = function (version)
     local gps_tick_thread = thread.create(gps_tick)
     local cell_tick_thread = thread.create(cell_tick)
     local firmware_check_thread = thread.create(get_firmware_version)
-    local out_cmd_thread = thread.create(process_out_cmd)
     local test_thread = thread.create(testing_thread)
     local charging_check_thread = thread.create(charging_check)
     local sms_wait_thread = thread.create(start_sms_thread)
     local socket_thread = thread.create(socket_thread_f)
-    local card_reader_send_thread = thread.create(card_reader_send_thread_f)
+
     logger(10, "GPS tick thread: ", tostring(gps_tick_thread));
     logger(10, "cell_tick_thread: ", tostring(cell_tick_thread));
     logger(10, "Firmware check thread: ", tostring(firmware_check_thread));
     logger(10, "Config update thread: ", tostring(config_update_thread));
-    logger(10, "Command parser thread: ", tostring(out_cmd_thread))
     logger(10, "Test thread: ", tostring(test_thread))
     logger(10, "Charging check thread: ", tostring(charging_check_thread))
     logger(10, "SMS wait thread: ", tostring(sms_wait_thread))
     logger(10, "Socket thread: ", tostring(socket_thread))
-    logger(10, "Card reader send thread: ", tostring(card_reader_send_thread))
     local result
     -- thread.sleep(1000);
     logger(10, "Starting threads");
@@ -536,8 +483,6 @@ local start_threads = function (version)
     logger(10, "Cell data start thread result is ", tostring(result))
     result = thread.run(firmware_check_thread)
     logger(10, "Firmware check start thread result is ", tostring(result))
-    result = thread.run(out_cmd_thread)
-    logger(10, "Command parser start thread result is ", tostring(result))
     result = thread.run(test_thread)
     logger(10, "Command parser start thread result is ", tostring(result))
     result = thread.run(charging_check_thread)
@@ -546,14 +491,14 @@ local start_threads = function (version)
     logger(10, "SMS thread start result is ", tostring(result))
     result = thread.run(socket_thread)
     logger(10, "Socket thread start result is ", tostring(result))
-    result = thread.run(card_reader_send_thread)
-    logger(10, "Card reader send thread start result is ", tostring(result))
 
+    local http_reporter_thread, running = http_reporter.start_thread()
+    logger(10, "HTTP reporter thread start result is ", running)
 
 
     logger(10, "Threads are running");
     local counter = 0
-    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(out_cmd_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) and thread.running(sms_wait_thread) and thread.running(socket_thread) and thread.running(card_reader_send_thread) do
+    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) and thread.running(sms_wait_thread) and thread.running(socket_thread) and thread.running(http_reporter_thread) do
     --while thread.running(config_update_thread) do
         logger(10, "All threads still running");
         logger(10, "Peak memory used: ", getpeakmem());
@@ -564,12 +509,11 @@ local start_threads = function (version)
             thread.stop(cell_tick_thread)
             thread.stop(firmware_check_thread)
             thread.stop(config_update_thread)
-            thread.stop(out_cmd_thread)
             thread.stop(test_thread)
             thread.stop(charging_check_thread)
             thread.stop(sms_wait_thread)
             thread.stop(socket_thread)
-            thread.stop(card_reader_send_thread)
+            thread.stop(http_reporter_thread)
             gps.gpsclose()
             break
         end
@@ -580,6 +524,7 @@ local start_threads = function (version)
             thread.sleep(10000)
             at.reset()
         end
+        setevt(WAIT_EVENT_MESSAGE_QUEUE)
         logger(30, "Main thread sleeping. Max mem: ", tostring(getpeakmem()))
         thread.sleep(config.get_config_value("MAIN_THREAD_SLEEP"));
     end;
@@ -588,12 +533,11 @@ local start_threads = function (version)
     logger(30, "cell_tick_thread running: ", thread.running(cell_tick_thread));
     logger(30, "Firmware check thread running: ", thread.running(firmware_check_thread));
     logger(30, "Config update thread running: ", thread.running(config_update_thread));
-    logger(30, "Command parser thread running: ", thread.running(out_cmd_thread));
     logger(30, "Charging check thread running: ", thread.running(charging_check_thread));
     logger(30, "Socket thread running: ", thread.running(test_thread));
     logger(30, "SMS wait thread running: ", thread.running(sms_wait_thread));
     logger(30, "Socket thread running: ", thread.running(socket_thread));
-    logger(30, "Card reader send thread running: ", thread.running(card_reader_send_thread));
+    logger(30, "HTTP reporter thread running: ", thread.running(http_reporter_thread));
 
     logger(30, "Loop counter: ", counter);
     thread.sleep(2000)

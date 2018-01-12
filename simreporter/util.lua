@@ -109,7 +109,7 @@ local response_to_array = function(response, key, key_val_sep, field_sep, field_
         logger.log("util", 0, "Reponse string is nil. Not parsing");
         return return_table;
     end;
-    line_array = split(response, "\r\n");
+    local line_array = split(response, "\r\n");
     for num = 1,#line_array do
         logger.log("util", 0, "Processing line ", tostring(line_array[num]));
         if not line_array[num] then
@@ -117,20 +117,33 @@ local response_to_array = function(response, key, key_val_sep, field_sep, field_
         else
             if string.match(line_array[num], key) then
                 logger.log("util", 0, "Found key: ", key, " in line: ", line_array[num])
-                local key_value_arr = split(line_array[num], key_val_sep)
-                if #key_value_arr == 2 then
-                    local field_array = safe_split(key_value_arr[2], field_sep, true)
+                --local key_value_arr = split(line_array[num], key_val_sep)
+                local key, value = line_array[num]:match('([^' .. key_val_sep .. ']*)' .. key_val_sep .. '(.*)')
+                if key and value then
+                    -- local field_array = safe_split(key_value_arr[2], field_sep, true)
+                    local field_array = safe_split(value, field_sep, true)
                     if field_array == nil then
                         logger.log("util", 30, "Unable to split key/value pair. Field array is nil");
                     elseif #field_array ~= #field_name_array then
-                        logger.log("util", 30, "Field array size does not match. Expecting: ", tostring(#field_name_array), " but got: ", tostring(#field_array));
+                        logger.log(
+                            "util",
+                            30,
+                            "Field array size does not match. Expecting: ",
+                            tostring(#field_name_array),
+                            " but got: ",
+                            tostring(#field_array),
+                            ", line: ",
+                            line_array[num],
+                            ", looking for: ",
+                            key
+                        )
                     else
                         for field_name_iter = 1, #field_name_array do
                             return_table[field_name_array[field_name_iter]] = trim(field_array[field_name_iter]);
                         end
                     end
                 else
-                    logger.log("util", 30, "Unable to split key/value pair. Size is ", #key_value_arr);
+                    logger.log("util", 30, "Unable to split key/value pair for line", line_array[num]);
                 end
             else
                 logger.log("util", 20, "Key: ", key, " not in line: ", line_array[num]);

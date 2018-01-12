@@ -47,7 +47,7 @@ local log = function(library, level, ...)
             thread.enter_cs(3);
             thread_index = tostring(thread.index())
         end
-        print(thread_index, ":", library, ":", file_line.linedefined, ":", level, ":")
+        print(os.clock(), ":", thread_index, ":", library, ":", file_line.linedefined, ":", level, ":")
         for i, value in ipairs(arg) do
             print(tostring(value))
         end

@@ -1,0 +1,201 @@
+--
+-- Created by IntelliJ IDEA.
+-- User: matt
+-- Date: 31/12/17
+-- Time: 10:52 AM
+-- To change this template use File | Settings | File Templates.
+--
+
+
+local logging = require("logging")
+local list = require("list")
+local http_lib = require("http_lib")
+local config = require("config")
+
+local logger = logging.create("http_reporter", 30)
+
+local REPORTER_THREAD
+local REPORTER_CLIENT_ID = config.get_config_value("NET_CLIENT_ID_HTTP_REPORTER")
+local REPORTER_CRITICAL_SECTION = config.get_config_value("CRITICAL_SECTION_HTTP_REPORTER")
+local MESSAGE_ID_COUNTER = 0
+local BACK_OFF_TIME = 0
+local BACK_OFF_UNTIL = 0
+
+local DataQueue = {}
+DataQueue.__index = DataQueue -- failed table lookups on the instances should fallback to the class table, to get methods
+
+setmetatable(DataQueue, {
+    __call = function (cls, ...)
+        local self = setmetatable({}, cls)
+        self:_init(...)
+        return self
+  end,
+})
+
+function DataQueue:_init(max_length)
+    self.data_list = list.List(max_length)
+    return self
+end
+
+-- format of call_back is function(data["message_id"], result, headers, response)
+function DataQueue:add_message(call_back, message, headers, host, port, path, encrypt)
+    local payload = {}
+    MESSAGE_ID_COUNTER = MESSAGE_ID_COUNTER + 1
+    payload["message_id"] = MESSAGE_ID_COUNTER
+    payload["os_clock"] = os.clock()
+    payload["message"] = message
+    payload["host"] = host
+    payload["port"] = port
+    payload["path"] = path
+    payload["headers"] = headers
+    payload["encrypt"] = encrypt
+    payload["call_back"] = call_back
+    payload["failure_count"] = 0
+    logger(0, "Adding message to queue: ", payload)
+    thread.enter_cs(REPORTER_CRITICAL_SECTION)
+    self.data_list:push_left(payload)
+    thread.leave_cs(REPORTER_CRITICAL_SECTION)
+    logger(0, "Message added. Queue length is: ", self.data_list:length())
+    if REPORTER_THREAD then
+        thread.signal_notify(REPORTER_THREAD, 1)
+    end
+    logger(0, "Signal has been sent")
+    return payload["message_id"]
+end
+
+function DataQueue:requeue_message(payload)
+    logger(0, "Putting message back on queue. Payload: ", payload)
+    payload["failure_count"] = payload["failure_count"] + 1
+    if payload["failure_count"] < config.get_config_value("MAX_HTTP_REPORTER_PAYLOAD_ATTEMPTS") then
+
+        thread.enter_cs(REPORTER_CRITICAL_SECTION)
+        self.data_list:push_right(payload)
+        thread.leave_cs(REPORTER_CRITICAL_SECTION)
+    else
+        logger(30, "Max attempts exceeded. Not adding back to queue.")
+    end
+end
+
+function DataQueue:get_message()
+    thread.enter_cs(REPORTER_CRITICAL_SECTION)
+    local message = self.data_list:pop_left()
+    thread.leave_cs(REPORTER_CRITICAL_SECTION)
+    return message
+end
+
+function DataQueue:length()
+    return self.data_list:length()
+end
+
+local DATA_QUEUE = DataQueue(200)
+
+local function http_reporter_thread_f()
+    local key_data = true
+
+    while true do
+        -- local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(1000000)
+        local waited_mask = thread.signal_wait(255, 100000)
+        logger(10, "out of thread.signal_wait")
+
+        if os.clock() < BACK_OFF_UNTIL then
+            logger(
+                0,
+                "Not sending data as we haven't reach the back off timer. BACK_OFF_UNTIL: ",
+                BACK_OFF_UNTIL,
+                " current time: ",
+                os.clock()
+            )
+        else
+            logger(
+                0,
+                "Back off timer is ok. BACK_OFF_UNTIL: ",
+                BACK_OFF_UNTIL,
+                " current time: ",
+                os.clock()
+            )
+
+            local failure_count = 0
+
+            local max_attempts_exceeded = false
+            while DATA_QUEUE:length() > 0 and not max_attempts_exceeded do
+                local message = DATA_QUEUE:get_message()
+                if message then
+                    local headers = message["headers"]
+                    headers["age"] = os.clock() - message["os_clock"]
+                    local result, headers, response = http_lib.http_connect_send_close(
+                        REPORTER_CLIENT_ID,
+                        message["host"],
+                        message["port"],
+                        message["path"],
+                        message["message"],
+                        headers,
+                        message["encrypt"]
+                    )
+                    if message["call_back"] then
+                        local pcall_result = pcall(message["call_back"], message["message_id"], result, headers, response)
+                        logger(0, "Callback result was: ", pcall_result)
+                    end
+                    logger(20, "Result is >", tostring(result), "< and response is: ", response)
+                    if result and headers["response_code"] == "200" then
+                        logger(20, "Data was sent to url: http://", message["host"], ":", message["port"], message["path"])
+                        BACK_OFF_TIME = 0
+                    else
+                        logger(30,
+                            "Data was not sent to url: http://", message["host"], ":", message["port"], message["path"],
+                            " and result is ", tostring(result), " and response is ", response
+                        )
+                        failure_count = failure_count + 1
+                        DATA_QUEUE:requeue_message(message)
+                    end
+                    collectgarbage();
+                else
+                    logger(30, "Data to send but no data returned. Object is: ", message)
+                    failure_count = failure_count + 1
+                end
+                if failure_count >= config.get_config_value("MAX_HTTP_REPORTER_SEND_ATTEMPTS") then
+                    logger(30, "Too many failed attempts. Giving up for now. Failed count is: ", failure_count)
+                    if BACK_OFF_TIME == 0 then
+                        BACK_OFF_TIME = 2
+                    elseif BACK_OFF_TIME < 480 then
+                        BACK_OFF_TIME = BACK_OFF_TIME * 2
+                    end
+                    logger(0, "Backing off for ", BACK_OFF_TIME, " seconds")
+                    BACK_OFF_UNTIL = os.clock() + BACK_OFF_TIME
+                    logger(0, "Backing off until ", BACK_OFF_UNTIL)
+                    max_attempts_exceeded = true
+                end
+                collectgarbage();
+            end
+
+        end
+
+    end
+end
+
+local function http_reporter_thread_wrapper()
+    while true do
+        local result = pcall(http_reporter_thread_f)
+        logger(30, "HTTP reporter thread exited. Sleeping before restart. pcall result: ", result)
+        thread.sleep(10000)
+    end
+end
+
+local function start_thread()
+    local http_reporter_thread = thread.create(http_reporter_thread_wrapper)
+    local running = thread.run(http_reporter_thread)
+    REPORTER_THREAD = http_reporter_thread
+    logger(10, "HTTP reporter thread start result is ", tostring(running))
+    return http_reporter_thread, running
+end
+
+local function add_message(call_back, message, headers, host, port, path, encrypt)
+    return DATA_QUEUE:add_message(call_back, message, headers, host, port, path, encrypt)
+end
+
+local api = {
+    add_message = add_message,
+    start_thread = start_thread,
+    --synchronous_http_get = synchronous_http_get,
+}
+
+return api
