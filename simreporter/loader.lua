@@ -20,7 +20,8 @@ function split(str, delim)
     table.insert(result, string.sub(str, lastPos))
     return result
 end
-
+sio.clear()
+sio.send("AT+CFUN=0\r\n")
 DEBUG_LEVEL = 10
 vmsleep(7000);
 printdir(1);
@@ -36,9 +37,7 @@ local function get_battery_level()
     local battery_response = sio.recv(5000)
     local batt_table = split(battery_response, "\r\n")
     for i,line in pairs(batt_table) do
-        print("Line is " .. line .. "\r\n")
         if line:match("+CBC:") then
-            print("In cbc line\r\n")
             local line_table = split(line, ",")
             if #line_table == 3 then
                 print("Matched. Battery is at " .. line_table[2] .. "\r\n")
@@ -56,12 +55,14 @@ local function get_battery_level()
 end
 
 while get_battery_level() < MIN_BAT_LEVEL do
-    print("Battery level to low. Sleeping\r\n")
-    vmsleep(5000)
+    print("Battery level too low. Sleeping\r\n")
+    vmsleep(30000)
 end
 print("Battery ok.\r\n")
 sio.send("ATE1\r\n")
 ate_response = sio.recv(5000)
+sio.send("AT+CFUN=1\r\n")
+cfun_response = sio.recv(5000)
 
 
 quarantine_version = function(version)
@@ -222,10 +223,14 @@ print("main_id=", main_id, "\r\n");
 
 collectgarbage();
 print("Starting threads\r\n")
-local status, result = pcall(basic_threads.start_threads(running_version))
+if basic_threads.start_threads then
+    local status, result = pcall(basic_threads.start_threads, running_version)
 
-print("exit main thread\r\n")
+    print("exit main thread\r\n")
 
-print(result)
-print(status)
+    print(tostring(result) .. "\r\n")
+    print(tostring(status) .. "\r\n")
+else
+    print("No function to call. Resetting module\r\n")
+end
 sio.send("AT+CRESET\r\n")
