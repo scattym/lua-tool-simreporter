@@ -13,10 +13,12 @@ local logging = require("logging")
 local keygen = require("keygen")
 local rsa = require("rsa_lib")
 local network_setup = require("network_setup")
-local socket_thread = require("socket_thread")
+local socket_lib = require("socket_thread")
 local sms_lib = require("sms_lib")
 local system = require("system")
 local http_reporter = require("http_reporter")
+local event_farmer = require("event_farmer")
+local gpio_lib = require("gpio_lib")
 
 local logger = logging.create("basic_threads", 30)
 
@@ -384,18 +386,32 @@ local function handle_card_read_command(cmd_port, cmd_name, cmd_op, cmd_line, cm
     )
 end
 
+
+local function handle_uart_data_cb(data)
+    data = "AT+CARDR=" .. data
+    handle_card_read_command(data)
+end
+
 local function testing_thread()
     at.register_command("+CARDR", handle_card_read_command, 1)
     while true do
-        pcall(at.wait_at_command_thread)
+        pcall(at.wait_at_command_thread, handle_uart_data_cb)
         logger(30, "Wait command function exited. Sleeping before restart")
+        thread.sleep(10000)
+    end
+end
+
+local function uart_read_thread_f()
+    while true do
+        pcall(at.wait_uart_data, handle_uart_data_cb)
+        logger(30, "Uart read function exited. Sleeping before restart")
         thread.sleep(10000)
     end
 end
 
 local function socket_thread_f()
     while true do
-        pcall(socket_thread.socket_thread, NET_CLIENT_ID_SOCKET, imei, running_version)
+        pcall(socket_lib.socket_thread, NET_CLIENT_ID_SOCKET, imei, running_version)
         logger(30, "Socket function exited. Sleeping before restart")
         thread.sleep(10000)
     end
@@ -425,12 +441,36 @@ local function device_setup()
     network_setup.set_network_from_sms_operator();
 end
 
+local function gpio_handler(pin, state, clock)
+    logger(30, "Pin: ", pin, " state: ", state, " clock: ", clock)
+end
+
+local THREAD_LIST = {}
+local function start_thread(name, thread_func)
+    local thread_ptr = thread.create(thread_func)
+    logger(10, "Thread: ", name, " has id: ", thread_ptr)
+    THREAD_LIST[name] = thread_ptr
+    local result = thread.run(thread_ptr)
+    logger(10, "Starting thread ", name, " result is ", tostring(result))
+end
+
+local function all_threads_running()
+    local all_running = true
+    for key, value in pairs(THREAD_LIST) do
+        if thread.running(value) == false then
+            logger(30, "Thread ", key, " with id ", value, " is no longer running")
+            all_running = false
+        end
+    end
+    return all_running
+end
+
 
 local start_threads = function (version)
     running_version = version;
 
     while get_battery_percent() < config.get_config_value("MIN_BAT_PERCENT_FOR_BOOT") do
-        logger(30, "Battery level too low not starting threads.");
+        logger(30, "Battery level too low not starting threads.")
         vmsleep(30000)
     end
 
@@ -454,65 +494,37 @@ local start_threads = function (version)
         firmware.check_firmware_and_maybe_update(imei, running_version)
     end
 
-    logger(10, "Start of start_threads")
-    local config_update_thread = thread.create(get_config)
-    local gps_tick_thread = thread.create(gps_tick)
-    local cell_tick_thread = thread.create(cell_tick)
-    local firmware_check_thread = thread.create(get_firmware_version)
-    local test_thread = thread.create(testing_thread)
-    local charging_check_thread = thread.create(charging_check)
-    local sms_wait_thread = thread.create(start_sms_thread)
-    local socket_thread = thread.create(socket_thread_f)
+    event_farmer.add_event_handler(0, gpio_lib.gpio_event_handler_cb)
+    -- Set pin 42 to default high, level triggered, trigger on low and save
+    gpio_lib.add_gpio_handler(42, 0, 0, 1, 1, gpio_handler)
 
-    logger(10, "GPS tick thread: ", tostring(gps_tick_thread));
-    logger(10, "cell_tick_thread: ", tostring(cell_tick_thread));
-    logger(10, "Firmware check thread: ", tostring(firmware_check_thread));
-    logger(10, "Config update thread: ", tostring(config_update_thread));
-    logger(10, "Test thread: ", tostring(test_thread))
-    logger(10, "Charging check thread: ", tostring(charging_check_thread))
-    logger(10, "SMS wait thread: ", tostring(sms_wait_thread))
-    logger(10, "Socket thread: ", tostring(socket_thread))
-    local result
-    -- thread.sleep(1000);
-    logger(10, "Starting threads");
-    result = thread.run(config_update_thread)
-    logger(10, "Config update start thread result is ", tostring(result))
-    result = thread.run(gps_tick_thread)
-    logger(10, "GPS start thread result is ", tostring(result))
-    result = thread.run(cell_tick_thread)
-    logger(10, "Cell data start thread result is ", tostring(result))
-    result = thread.run(firmware_check_thread)
-    logger(10, "Firmware check start thread result is ", tostring(result))
-    result = thread.run(test_thread)
-    logger(10, "Command parser start thread result is ", tostring(result))
-    result = thread.run(charging_check_thread)
-    logger(10, "Charging check start thread result is ", tostring(result))
-    result = thread.run(sms_wait_thread)
-    logger(10, "SMS thread start result is ", tostring(result))
-    result = thread.run(socket_thread)
-    logger(10, "Socket thread start result is ", tostring(result))
+    logger(10, "Start of start_threads")
+    start_thread("config_update", get_config)
+    start_thread("gps_tick", gps_tick)
+    start_thread("cell_tick", cell_tick)
+    start_thread("firmware_check", get_firmware_version)
+    start_thread("test_thread", testing_thread)
+    start_thread("charging_check", charging_check)
+    start_thread("sms_processor", start_sms_thread)
+    start_thread("socket_thread", socket_thread_f)
+    start_thread("uart_read_thread", uart_read_thread_f)
 
     local http_reporter_thread, running = http_reporter.start_thread()
     logger(10, "HTTP reporter thread start result is ", running)
 
 
+    start_thread("gpio_handler", gpio_lib.gpio_handler_thread_wrapper)
+    start_thread("event_handler", event_farmer.event_handler_thread_wrapper)
+
     logger(10, "Threads are running");
     local counter = 0
-    while thread.running(gps_tick_thread) and thread.running(cell_tick_thread) and thread.running(firmware_check_thread) and thread.running(config_update_thread) and thread.running(test_thread)  and thread.running(charging_check_thread) and thread.running(sms_wait_thread) and thread.running(socket_thread) and thread.running(http_reporter_thread) do
+    while thread.running(http_reporter_thread) and all_threads_running() do
     --while thread.running(config_update_thread) do
         logger(10, "All threads still running");
         logger(10, "Peak memory used: ", getpeakmem());
         counter = counter+1;
         local main_thread_loop_count = config.get_config_value("MAX_MAIN_THREAD_LOOP_COUNT")
         if( main_thread_loop_count > 0 and counter > main_thread_loop_count) then
-            thread.stop(gps_tick_thread)
-            thread.stop(cell_tick_thread)
-            thread.stop(firmware_check_thread)
-            thread.stop(config_update_thread)
-            thread.stop(test_thread)
-            thread.stop(charging_check_thread)
-            thread.stop(sms_wait_thread)
-            thread.stop(socket_thread)
             thread.stop(http_reporter_thread)
             gps.gpsclose()
             break
@@ -529,15 +541,7 @@ local start_threads = function (version)
         thread.sleep(config.get_config_value("MAIN_THREAD_SLEEP"));
     end;
     logger(30, "One of the threads is not running or reached max loop count.");
-    logger(30, "GPS tick thread running: ", thread.running(gps_tick_thread));
-    logger(30, "cell_tick_thread running: ", thread.running(cell_tick_thread));
-    logger(30, "Firmware check thread running: ", thread.running(firmware_check_thread));
-    logger(30, "Config update thread running: ", thread.running(config_update_thread));
-    logger(30, "Charging check thread running: ", thread.running(charging_check_thread));
-    logger(30, "Socket thread running: ", thread.running(test_thread));
-    logger(30, "SMS wait thread running: ", thread.running(sms_wait_thread));
-    logger(30, "Socket thread running: ", thread.running(socket_thread));
-    logger(30, "HTTP reporter thread running: ", thread.running(http_reporter_thread));
+    logger(30, "HTTP reporter thread running: ", thread.running(http_reporter_thread))
 
     logger(30, "Loop counter: ", counter);
     thread.sleep(2000)

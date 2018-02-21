@@ -3,6 +3,7 @@
 --local thread = require "thread"
 
 collectgarbage();
+os.printport(3)
 
 function prequire(...)
     local status, lib = pcall(require, ...)

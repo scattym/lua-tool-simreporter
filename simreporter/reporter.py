@@ -125,7 +125,10 @@ def transfer_and_build_files(
 
         set_autorun(serial_port, True)
 
-        turn_off_power_check(serial_port)
+        try:
+            turn_off_power_check(serial_port)
+        except ValueError as err:
+            print("Failed to turn off power check. Could be 5360")
 
         # run_script(serial_port, "canary.out")
         # stop_script(serial_port)

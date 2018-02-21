@@ -1,22 +1,27 @@
-local logger = require("logging")
+local logging = require("logging")
 local _M = {}
 
 --supported port for atctl.setport(...)
 _M.ATCTL_UART_PORT  = 1
 _M.ATCTL_MODEM_PORT = 2
 _M.ATCTL_USBAT_PORT = 3
+_M.ATCTL_UART2_PORT = 4
 --  -1 is used to release the port
 _M.ATCTL_INVALID_PORT = -1
 
+_M.SIO_EVENT = 29
 _M.AT_CTL_EVENT = 30
 
 local CMD_CALLBACKS = {}
 
+local logger = logging.create("at_commands", 30)
+
+
 local run_command = function(cmd)
-    logger.log("at_commands", 0, "Running command: ", cmd, "<<")
-    logger.log("at_commands", 0, "Thread entering critical section");
+    logger(0, "Running command: ", cmd, "<<")
+    logger(0, "Thread entering critical section");
     thread.enter_cs(1);
-    logger.log("at_commands", 0, "Thread in critical section");
+    logger(0, "Thread in critical section");
     local echo_off = "ATE0\r\n"
     local echo_on = "ATE1\r\n"
     sio.send(echo_off)
@@ -25,17 +30,17 @@ local run_command = function(cmd)
 
     --clear sio recv cache
     sio.clear()
-    --logger.log("at_commands", 0, cmd .. "\r\n")
+    --logger(0, cmd .. "\r\n")
     sio.send(cmd .. "\r\n")
     --receive response with 5000 ms time out
     return_string = sio.recv(5000)
-    logger.log("at_commands", 0, rsp)
+    logger(0, rsp)
 
-    sio.send(echo_on)
+    sio.send(echo_off)
     --receive response with 5000 ms time out
     rsp = sio.recv(5000)
     thread.leave_cs(1);
-    logger.log("at_commands", 0, "Thread out of critical section");
+    logger(0, "Thread out of critical section");
 
     return return_string;
 end;
@@ -226,7 +231,7 @@ _M.set_cmgf = set_cmgf
 
 local register_command = function(command, callback, async)
     if not async or async < 0 or async > 1 then
-        logger.log("at_commands", 30, "Invalid async option. Setting to 0.")
+        logger(30, "Invalid async option. Setting to 0.")
         async = 0
     end
     atctl.atcadd(command, async)
@@ -234,7 +239,10 @@ local register_command = function(command, callback, async)
 end
 _M.register_command = register_command
 
-local wait_at_command_thread = function()
+local wait_at_command_thread = function(uart_callback)
+    -- atctl.setport(_M.ATCTL_UART_PORT)
+    -- atctl.send("Please input any AT command.\r\n");
+
     thread.setevtowner(_M.AT_CTL_EVENT, _M.AT_CTL_EVENT)
 
     -- thread.addevtfilter(100, true, _M.AT_CTL_EVENT)
@@ -243,20 +251,83 @@ local wait_at_command_thread = function()
         local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(9999999)
         if(evt == _M.AT_CTL_EVENT) then
             -- thread.clearevts()
+            logger(30, "Got an atctl event")
 
             local cmd_port, cmd_name, cmd_op, cmd_line, cmd_status = atctl.atcget()
-            if CMD_CALLBACKS[cmd_name] then
-                CMD_CALLBACKS[cmd_name](cmd_port, cmd_name, cmd_op, cmd_line, cmd_status)
+            if cmd_name then
+                if CMD_CALLBACKS[cmd_name] then
+                    CMD_CALLBACKS[cmd_name](cmd_port, cmd_name, cmd_op, cmd_line, cmd_status)
+                else
+                    logger(30, "No function handler for command: ", cmd_name)
+                end
             else
-                logger.log("at_commands", 30, "No function handler for command: ", cmd_name)
+                logger(30, "Must be uart data. Trying to read")
+
             end
         else
-            logger.log("at_commands", 30, "Got an event we are not listening for. Event: ", evt)
+            logger(30, "Got an event we are not listening for. Event: ", evt)
         end
         collectgarbage()
     end
 end
 _M.wait_at_command_thread = wait_at_command_thread
+
+
+
+local wait_uart_data = function(callback_func)
+    logger(30, "Start of uart wait thread")
+    -- sio.exclrpt(1); -- would set all URC to be via lua script
+    atctl.setport(-1)
+    atctl.setport(_M.ATCTL_UART_PORT)
+    logger(30, "Port set")
+    atctl.send("Please input any AT command.\r\n");
+    logger(30, "First data sent")
+    -- thread.setevtowner(_M.AT_CTL_EVENT, _M.AT_CTL_EVENT) -- was a copy from above
+    logger(30, "Start of uart wait thread")
+--    -- thread.addevtfilter(100, true, _M.AT_CTL_EVENT)
+    while true do
+        logger(30, "In while loop")
+        atctl.setport(_M.ATCTL_UART_PORT)
+        atctl.send("Please input any AT command.\r\n");
+
+        --local evt, evt_p1, evt_p2, evt_p3, evt_clock = waitevt(15000)
+--        if evt < 0 then
+--            logger(0, "Event timeout or spurious event.")
+--        else
+--            if ( evt == _M.AT_CTL_EVENT ) then
+                local payload = ""
+                local count_at_length = 0
+                while count_at_length < 4 do
+                    logger(30, "About to wait for data")
+                    local data = atctl.recv(5000)
+                    logger(30, "Out of recv")
+
+                    if data and #data > 0 then
+                        logger(30, "Adding data: ", data, " to payload:  ", payload)
+                        count_at_length = 0
+                        payload = payload .. data
+                    else
+                        logger(30, "No data received. Incrementing count at length. Payload is: ", payload)
+                        count_at_length = count_at_length + 1
+                    end
+                end
+                if payload and #payload > 0 then
+                    if callback_func then
+                        logger(0, "payload received, sending to cb function: ", payload)
+                        callback_func(payload)
+                    else
+                        logger(30, "Receivd payload but no callback function set")
+                    end
+                else
+                    logger(30, "No payload received on this atctl event")
+                end
+--            end
+--        end
+        collectgarbage()
+    end
+end
+_M.wait_uart_data = wait_uart_data
+
 
 local enable_time_updates = function()
     response = run_command("AT+CTZU=1");
