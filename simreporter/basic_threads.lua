@@ -267,7 +267,7 @@ local function gps_tick()
                             config.get_config_value("GPS_PATH"),
                             true
                         )
-                        socket_lib.send_data(NET_CLIENT_ID_SOCKET, encapsulated_payload)
+                        -- socket_lib.send_data(NET_CLIENT_ID_SOCKET, encapsulated_payload)
                     end;
                     collectgarbage();
                     update_last_gps_report() -- Update regardless of result as we want one try only
