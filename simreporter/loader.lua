@@ -55,10 +55,10 @@ local function get_battery_level()
     return bat_percent
 end
 
-while get_battery_level() < MIN_BAT_LEVEL do
-    print("Battery level too low. Sleeping\r\n")
-    vmsleep(30000)
-end
+-- while get_battery_level() < MIN_BAT_LEVEL do
+--     print("Battery level too low. Sleeping\r\n")
+--     vmsleep(30000)
+-- end
 print("Battery ok.\r\n")
 sio.send("ATE1\r\n")
 ate_response = sio.recv(5000)

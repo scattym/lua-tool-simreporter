@@ -12,8 +12,18 @@ local logging = require("logging")
 local util = require("util")
 local json = require("json")
 local logger = logging.create("socket_thread", 30)
+local list = require("list")
 
 local _M = {}
+
+local CRITICAL_SECTION_SOCKET_LIST = config.get_config_value("CRITICAL_SECTION_SOCKET_LIST")
+
+local MAX_BACKLOG = config.get_config_value("MAX_SOCKET_SEND_BACKLOG")
+if type(MAX_BACKLOG) ~= "number" then
+    MAX_BACKLOG = 10
+end
+local SOCKET_SEND_BUFFER_LIST = list.List(MAX_BACKLOG)
+
 
 local CLIENT_TO_SOCKET = {}
 
@@ -39,10 +49,12 @@ local check_hmac_and_return_json = function(json_str)
     return nil
 end
 
-local BUFFER = ""
 local send_data = function(client_id, data)
     if data then
-        BUFFER = data
+        thread.enter_cs(CRITICAL_SECTION_SOCKET_LIST)
+        SOCKET_SEND_BUFFER_LIST:push_right(data)
+        thread.leave_cs(CRITICAL_SECTION_SOCKET_LIST)
+
         if CLIENT_TO_SOCKET[client_id] then
             setevt(tcp.SOCKET_SEND_READY_EVENT, CLIENT_TO_SOCKET[client_id])
         end
@@ -112,12 +124,22 @@ local socket_thread = function(client_id, imei, version)
                         end
                     end
                 elseif send_ready then
-                    local err_code, bytes = socker.send(socket_fd, BUFFER)
-                    if (err_code and (err_code == tcp.SOCK_RST_OK)) then
-                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
-                    else
-                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
-                        connected = false
+                    while SOCKET_SEND_BUFFER_LIST:length() > 0 do
+                        thread.enter_cs(CRITICAL_SECTION_SOCKET_LIST)
+                        local buffer = SOCKET_SEND_BUFFER_LIST:pop_left()
+                        thread.leave_cs(CRITICAL_SECTION_SOCKET_LIST)
+
+                        local err_code, bytes = socker.send(socket_fd, buffer)
+                        if (err_code and (err_code == tcp.SOCK_RST_OK)) then
+                            logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
+                        else
+                            logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
+                            connected = false
+                            thread.enter_cs(CRITICAL_SECTION_SOCKET_LIST)
+                            SOCKET_SEND_BUFFER_LIST:push_left(buffer)
+                            thread.leave_cs(CRITICAL_SECTION_SOCKET_LIST)
+
+                        end
                     end
                 else
                     local err_code, bytes = socket.send(socket_fd, "C0NXN>")

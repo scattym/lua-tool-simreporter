@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package tracker;
+
+message IdentIMEI {
+    int64 imei = 1;
+}
+
+message Identifier {
+    oneof ident_oneof {
+        IdentIMEI imei = 1;
+    }
+
+}
+message PrimaryCell3G {
+    int32 uarfcn = 1;
+    int32 mcc = 2;
+    int32 mnc = 3;
+    int32 lac = 4;
+    int32 cell_id = 5;
+    int32 psc = 6;
+    int32 ssc = 7;
+    int32 rscp = 8;
+    int32 rcio = 9;
+    int32 rx_level = 10;
+    int32 tx_power = 11;
+}
+
+message NeighbouringCell3G {
+    int32 uarfcn = 1;
+    int32 psc = 2;
+    int32 ssc = 3;
+    int32 rscp = 4;
+    int32 rcio = 5;
+    int32 rx_levle = 6;
+
+}
+
+message CellList3G {
+    repeated PrimaryCell3G primary_cells = 1;
+    repeated NeighbouringCell3G neighbouring_cells = 2;
+}
+
+message CellInfo {
+    enum CellType {
+        CELL_3G = 0;
+        CELL_4G = 1;
+    }
+    oneof oneof_cell_lists {
+        CellList3G cell_list_3g =1;
+    }
+
+}
+message Data {
+    oneof data_oneof {
+        CellInfo cell_info =1;
+    }
+}
+message ReportBack {
+    Identifier identifier = 1;
+    repeated Data data = 2;
+    
+}
+

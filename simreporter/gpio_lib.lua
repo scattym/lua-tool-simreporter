@@ -66,7 +66,7 @@ end
 local function gpio_handler_thread_f()
     while true do
         -- local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(1000000)
-        local waited_mask = thread.signal_wait(255, 10000)
+        local waited_mask = thread.signal_wait(255, 1000000)
         logger(10, "out of thread.signal_wait")
         local event
         while GPIO_EVENT_LIST:length() > 0 do

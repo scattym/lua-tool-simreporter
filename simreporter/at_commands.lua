@@ -229,6 +229,17 @@ local set_cmgf = function(value)
 end
 _M.set_cmgf = set_cmgf
 
+-- AT+IPR2=9600
+local set_baud_rate = function(uart_num, baud_rate)
+    local extra = ""
+    if uart_num == "2" or uart_num == 2 then
+        extra = "2"
+    end
+    local response = run_command("AT+IPR" .. extra .. "=" .. tostring(baud_rate))
+    return response;
+end;
+_M.set_baud_rate = set_baud_rate
+
 local register_command = function(command, callback, async)
     if not async or async < 0 or async > 1 then
         logger(30, "Invalid async option. Setting to 0.")
@@ -261,7 +272,7 @@ local wait_at_command_thread = function(uart_callback)
                     logger(30, "No function handler for command: ", cmd_name)
                 end
             else
-                logger(30, "Must be uart data. Trying to read")
+                logger(10, "No command received. Could be uart.")
 
             end
         else
@@ -275,54 +286,42 @@ _M.wait_at_command_thread = wait_at_command_thread
 
 
 local wait_uart_data = function(callback_func)
-    logger(30, "Start of uart wait thread")
+    logger(0, "Start of uart wait thread")
+    local response = _M.set_baud_rate(2, 9600)
+    logger(30, "Set baud rate response was: " .. response)
     -- sio.exclrpt(1); -- would set all URC to be via lua script
     atctl.setport(-1)
-    atctl.setport(_M.ATCTL_UART_PORT)
-    logger(30, "Port set")
-    atctl.send("Please input any AT command.\r\n");
-    logger(30, "First data sent")
-    -- thread.setevtowner(_M.AT_CTL_EVENT, _M.AT_CTL_EVENT) -- was a copy from above
-    logger(30, "Start of uart wait thread")
---    -- thread.addevtfilter(100, true, _M.AT_CTL_EVENT)
+    atctl.setport(_M.ATCTL_UART2_PORT)
     while true do
-        logger(30, "In while loop")
-        atctl.setport(_M.ATCTL_UART_PORT)
-        atctl.send("Please input any AT command.\r\n");
+        local data = atctl.recv(10000000)
+        if not data then
+            logger(0, "Event timeout.")
+        else
+            logger(30, "Data received: " .. data)
+            local count_at_length = 0
+            while count_at_length < 4 do
+                local next_data = atctl.recv(100)
 
-        --local evt, evt_p1, evt_p2, evt_p3, evt_clock = waitevt(15000)
---        if evt < 0 then
---            logger(0, "Event timeout or spurious event.")
---        else
---            if ( evt == _M.AT_CTL_EVENT ) then
-                local payload = ""
-                local count_at_length = 0
-                while count_at_length < 4 do
-                    logger(30, "About to wait for data")
-                    local data = atctl.recv(5000)
-                    logger(30, "Out of recv")
-
-                    if data and #data > 0 then
-                        logger(30, "Adding data: ", data, " to payload:  ", payload)
-                        count_at_length = 0
-                        payload = payload .. data
-                    else
-                        logger(30, "No data received. Incrementing count at length. Payload is: ", payload)
-                        count_at_length = count_at_length + 1
-                    end
-                end
-                if payload and #payload > 0 then
-                    if callback_func then
-                        logger(0, "payload received, sending to cb function: ", payload)
-                        callback_func(payload)
-                    else
-                        logger(30, "Receivd payload but no callback function set")
-                    end
+                if next_data and #next_data > 0 then
+                    logger(30, "Adding data: ", next_data, " to payload:  ", data)
+                    count_at_length = 0
+                    data = data .. next_data
                 else
-                    logger(30, "No payload received on this atctl event")
+                    logger(30, "No data received. Incrementing count at length. Payload is: ", data)
+                    count_at_length = count_at_length + 1
                 end
---            end
---        end
+            end
+            if data and #data > 0 then
+                if callback_func then
+                    logger(30, "payload received, sending to cb function: ", data)
+                    callback_func(data)
+                else
+                    logger(30, "Receivd payload but no callback function set")
+                end
+            else
+                logger(30, "No payload received on this atctl event")
+            end
+        end
         collectgarbage()
     end
 end

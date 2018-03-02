@@ -267,6 +267,7 @@ local function gps_tick()
                             config.get_config_value("GPS_PATH"),
                             true
                         )
+                        socket_lib.send_data(NET_CLIENT_ID_SOCKET, encapsulated_payload)
                     end;
                     collectgarbage();
                     update_last_gps_report() -- Update regardless of result as we want one try only
@@ -388,8 +389,9 @@ end
 
 
 local function handle_uart_data_cb(data)
-    data = "AT+CARDR=" .. data
-    handle_card_read_command(data)
+    local base64_data = base64.encode(data)
+    local command = "AT+CARDR=" .. base64_data
+    handle_card_read_command("uart", "cardr", "op", command, "status")
 end
 
 local function testing_thread()
