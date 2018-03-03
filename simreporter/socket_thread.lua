@@ -27,12 +27,12 @@ local SOCKET_SEND_BUFFER_LIST = list.List(MAX_BACKLOG)
 
 local CLIENT_TO_SOCKET = {}
 
-local send_data = function(client_id, data)
-    if CLIENT_TO_SOCKET[client_id] and CLIENT_TO_SOCKET[client_id] ~= -1 then
-        local err_code, bytes = socket.send(CLIENT_TO_SOCKET[client_id], data)
-    end
-end
-_M.send_data = send_data
+--local send_data = function(client_id, data)
+--    if CLIENT_TO_SOCKET[client_id] and CLIENT_TO_SOCKET[client_id] ~= -1 then
+--        local err_code, bytes = socket.send(CLIENT_TO_SOCKET[client_id], data)
+--    end
+--end
+--_M.send_data = send_data
 
 local check_hmac_and_return_json = function(json_str)
     logger(0, "Checking command json")
@@ -58,6 +58,31 @@ local send_data = function(client_id, data)
         if CLIENT_TO_SOCKET[client_id] then
             setevt(tcp.SOCKET_SEND_READY_EVENT, CLIENT_TO_SOCKET[client_id])
         end
+    end
+end
+_M.send_data = send_data
+
+local parse_cli = function(cli_command)
+    if cli_command == "config" then
+        return config.config_as_str()
+    end
+end
+
+local process_payload = function(client_id, data)
+    local json_object = check_hmac_and_return_json(data)
+    local return_string = ""
+    if json_object then
+        if json_object["command"] then
+            return_string = return_string .. at.run_command(json_object["command"])
+        end
+        if json_object["cli"] then
+            return_string = return_string .. parse_cli(json_object["cli"])
+        end
+        if return_string ~= "" then
+            send_data(client_id, return_string)
+        end
+    else
+        logger(30, "Command did not pass validation.")
     end
 end
 
@@ -104,23 +129,7 @@ local socket_thread = function(client_id, imei, version)
                         connected = false
                     else
                         if( data ~= nil ) then
-                            local json_object = check_hmac_and_return_json(data)
-                            if json_object and json_object["command"] then
-                                local return_string = at.run_command(json_object["command"])
-                                -- local return_string = at.run_command(string.gsub(data, "[\r\n]", ""))
-                                if return_string ~= nil then
-                                    local err_code, bytes = socket.send(socket_fd, return_string)
-
-                                    if (err_code and (err_code == tcp.SOCK_RST_OK)) then
-                                        logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
-                                    else
-                                        logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
-                                        connected = false
-                                    end
-                                end
-                            else
-                                logger(30, "Command did not pass validation.")
-                            end
+                            process_payload(client_id, data)
                         end
                     end
                 elseif send_ready then
@@ -129,7 +138,7 @@ local socket_thread = function(client_id, imei, version)
                         local buffer = SOCKET_SEND_BUFFER_LIST:pop_left()
                         thread.leave_cs(CRITICAL_SECTION_SOCKET_LIST)
 
-                        local err_code, bytes = socker.send(socket_fd, buffer)
+                        local err_code, bytes = socket.send(socket_fd, buffer)
                         if (err_code and (err_code == tcp.SOCK_RST_OK)) then
                             logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                         else

@@ -334,6 +334,11 @@ local load_config_from_server = function(imei, version)
 end
 _M.load_config_from_server = load_config_from_server
 
+local config_as_str = function()
+    return json.encode(CONFIG)
+end
+_M.config_as_str = config_as_str
+
 local dump_config = function()
     for key, value in pairs(CONFIG) do
         logger.log("config", 30, "Key: ", key, " and value: ", value)
