@@ -13,10 +13,12 @@ local util = require("util")
 local json = require("json")
 local logger = logging.create("socket_thread", 30)
 local list = require("list")
+local aes = require("aes")
 
 local _M = {}
 
 local CRITICAL_SECTION_SOCKET_LIST = config.get_config_value("CRITICAL_SECTION_SOCKET_LIST")
+local MAX_SOCK_RETRIES = 5
 
 local MAX_BACKLOG = config.get_config_value("MAX_SOCKET_SEND_BACKLOG")
 if type(MAX_BACKLOG) ~= "number" then
@@ -36,23 +38,39 @@ local CLIENT_TO_SOCKET = {}
 
 local check_hmac_and_return_json = function(json_str)
     logger(0, "Checking command json")
-    local config_table = json.decode(json_str)
-    if not config_table then
+    local json_table = json.decode(json_str)
+    if not json_table then
         logger(30, "Unable to load json from string")
         return nil
     end
-    if config.check_hmac_config(config_table) then
+    if config.check_hmac_config(json_table) then
         logger(0, "Passed hmac test, returning table")
-        return config_table
+        return json_table
     end
     logger(30, "Failed hmac test, returning nil")
     return nil
 end
 
-local send_data = function(client_id, data)
+local send_data = function(client_id, data, retry_attempts, encrypt)
     if data then
+        local packet = {}
+        if encrypt and encrypt == true then
+            logger(30, "Before payload enctyption")
+            packet["data"] = aes.encrypt("password", data, aes.AES128, aes.CBCMODE)
+            logger(30, "After payload enctyption")
+            packet["encrypted"] = true
+        else
+            packet["data"] = data
+            packet["encrypted"] = false
+        end
+        packet["retry_attempts"] = 0
+        packet["retry_count"] = 0
+        packet["bytes"] = #packet["data"]
+        if retry_attempts and type(retry_attempts) == 'number' then
+            packet["retry_attempts"] = retry_attempts
+        end
         thread.enter_cs(CRITICAL_SECTION_SOCKET_LIST)
-        SOCKET_SEND_BUFFER_LIST:push_right(data)
+        SOCKET_SEND_BUFFER_LIST:push_right(packet)
         thread.leave_cs(CRITICAL_SECTION_SOCKET_LIST)
 
         if CLIENT_TO_SOCKET[client_id] then
@@ -79,7 +97,7 @@ local process_payload = function(client_id, data)
             return_string = return_string .. parse_cli(json_object["cli"])
         end
         if return_string ~= "" then
-            send_data(client_id, return_string)
+            send_data(client_id, return_string, 1, true)
         end
     else
         logger(30, "Command did not pass validation.")
@@ -138,16 +156,22 @@ local socket_thread = function(client_id, imei, version)
                         local buffer = SOCKET_SEND_BUFFER_LIST:pop_left()
                         thread.leave_cs(CRITICAL_SECTION_SOCKET_LIST)
 
-                        local err_code, bytes = socket.send(socket_fd, buffer)
+                        local header = "DATA" .. tostring(buffer["bytes"]) .. ">"
+                        if buffer["encrypted"] == true then
+                            header = "ENC" .. header
+                        end
+                        local err_code, bytes = socket.send(socket_fd, header .. buffer["data"])
                         if (err_code and (err_code == tcp.SOCK_RST_OK)) then
                             logger(0, "Data sent ok. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                         else
                             logger(30, "Data not sent. err_code: ", tostring(err_code), " bytes sent: ", tostring(bytes))
                             connected = false
-                            thread.enter_cs(CRITICAL_SECTION_SOCKET_LIST)
-                            SOCKET_SEND_BUFFER_LIST:push_left(buffer)
-                            thread.leave_cs(CRITICAL_SECTION_SOCKET_LIST)
-
+                            if buffer["retry"] and buffer["retry_count"] < buffer["retry_attempts"] then
+                                buffer["retry_count"] = buffer["retry_count"] + 1
+                                thread.enter_cs(CRITICAL_SECTION_SOCKET_LIST)
+                                SOCKET_SEND_BUFFER_LIST:push_left(buffer)
+                                thread.leave_cs(CRITICAL_SECTION_SOCKET_LIST)
+                            end
                         end
                     end
                 else
