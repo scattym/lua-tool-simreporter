@@ -179,12 +179,15 @@ if __name__ == '__main__':
     files = config.get('release', 'files').split(",")
     date = datetime.datetime.utcnow()
     date_str = date.strftime("%Y%m%d")
-    full_file = ""
-    for counter in range(0, 100):
-        counter_str = str(counter).zfill(2)
-        full_file = "%s%s%s" % (date_str, counter_str, ".zip")
-        if not os.path.isfile("build/%s" % full_file):
-            break
+    full_file = os.environ.get("IMAGE_NAME")
+    if full_file:
+        full_file = "%s%s" % (full_file, ".zip")
+    else:
+        for counter in range(0, 100):
+            counter_str = str(counter).zfill(2)
+            full_file = "%s%s%s" % (date_str, counter_str, ".zip")
+            if not os.path.isfile("build/%s" % full_file):
+                break
     print("Full file is %s" % full_file)
 
     transfer_and_build_files(
