@@ -156,7 +156,7 @@ local socket_thread = function(client_id, imei, version)
                         local buffer = SOCKET_SEND_BUFFER_LIST:pop_left()
                         thread.leave_cs(CRITICAL_SECTION_SOCKET_LIST)
 
-                        local header = "DATA" .. tostring(buffer["bytes"]) .. ">"
+                        local header = "DATA:" .. tostring(buffer["bytes"]) .. ">"
                         if buffer["encrypted"] == true then
                             header = "ENC" .. header
                         end

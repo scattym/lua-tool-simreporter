@@ -249,7 +249,7 @@ local function gps_tick()
                         update_last_cell_report();
                     end
 
-                    local nmea_data = nmea.getinfo(65);
+                    local nmea_data = nmea.getinfo(511);
                     if (nmea_data) then
                         logger(10, "nmea_data, len=", string.len(nmea_data));
                         local nmea_table = {}

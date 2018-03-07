@@ -14,7 +14,6 @@ local at = require("at_commands")
 local json = require("json")
 local logger = require("logging")
 local config = require("config")
-local client_id = 3
 local NET_CLIENT_ID_FIRMWARE = config.get_config_value("NET_CLIENT_ID_FIRMWARE")
 
 local function tohex(data)
@@ -25,7 +24,7 @@ end
 
 logger.create_logger("firmware", 30)
 
-function get_firmware(imei, version)
+local function get_firmware(imei, version)
     local fn_result = false
 
     collectgarbage()
@@ -49,22 +48,22 @@ function get_firmware(imei, version)
                 logger.log("firmware", 10, firmware_json["version"]);
                 logger.log("firmware", 10, "File length: ", tostring(#firmware_json["file"]));
                 logger.log("firmware", 10, "Advertised checksum: ", tostring(firmware_json["checksum"]))
-                raw_data = base64.decode(firmware_json["file"])
+                local raw_data = base64.decode(firmware_json["file"])
                 collectgarbage()
-                hash = sha256.init()
+                local hash = sha256.init()
                 hash:update(raw_data)
-                checksum = hash:final()
-                checksum_hex = tohex(checksum)
+                local checksum = hash:final()
+                local checksum_hex = tohex(checksum)
                 collectgarbage()
                 if( not string.equal(checksum_hex, firmware_json["checksum"]) ) then
                     logger.log("firmware", 30, "Checksums do not match. Calculated checksum is: ", checksum_hex, " but should be: ", firmware_json["checksum"])
                 else
                     if( raw_data ) then
                         local zip_file_name = "c:/" .. firmware_json["version"] .. ".zip"
-                        file = io.open(zip_file_name,"w") assert(file)
+                        local file = io.open(zip_file_name,"w") assert(file)
                         file:write(raw_data, "\n")
                         file:close()
-                        unzip_result = unzip.unzip_file(zip_file_name, "c:/libs/" .. firmware_json["version"] .. "/")
+                        local unzip_result = unzip.unzip_file(zip_file_name, "c:/libs/" .. firmware_json["version"] .. "/")
                         fn_result = unzip_result
                         logger.log("firmware", 10, "Result of unzip is: ", unzip_result)
                         os.delfile(zip_file_name)
@@ -89,7 +88,7 @@ local check_firmware_and_maybe_update = function(imei, current_version)
     else
         logger.log("firmware", 10, "Response is ", response)
 
-        version = tonumber(response)
+        local version = tonumber(response)
         if( not version and response ~= "unknown") then
             logger.log("firmware", 30, "Invalid response. Expecting version number. Got: ", response)
         end
@@ -135,7 +134,7 @@ local check_firmware_and_maybe_reset = function(imei, current_version)
     else
         logger.log("firmware", 10, "Response is ", response)
 
-        version = tonumber(response)
+        local version = tonumber(response)
         if( not version and response ~= "unknown") then
             logger.log("firmware", 30, "Invalid response. Expecting version number. Got: ", response)
         end
