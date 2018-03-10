@@ -34,7 +34,15 @@ def file_is_newer_than(file1, file2):
     return True
 
 
-def transfer_and_build_files(directory, initial_reset, force_all_files, send_loader, only_file, config_file):
+def transfer_and_build_files(
+        directory,
+        initial_reset,
+        force_all_files,
+        send_loader,
+        only_file,
+        config_file,
+        force_zip
+):
     serial_port = open_config_port(config_file=config_file)
 
     try:
@@ -112,6 +120,8 @@ def transfer_and_build_files(directory, initial_reset, force_all_files, send_loa
 
         if len(compile_files) == 0:
             print("Nothing changed in this build")
+            if force_zip:
+                zip_files(full_file)
         else:
             zip_files(full_file)
 
@@ -167,7 +177,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-z',
         '--zip-files',
-        help="Create zip file and don't upload scripts to device.",
+        help="Create zip files even if nothing changed.",
         default=False,
         action="store_true"
     )
@@ -197,6 +207,7 @@ if __name__ == '__main__':
         args.loader,
         args.transfer_file,
         args.config_file,
+        args.zip_files
     )
 
 
