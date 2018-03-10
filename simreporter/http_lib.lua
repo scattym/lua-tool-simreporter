@@ -152,6 +152,11 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
         if( result and response ) then
             local headers, response_payload = parse_http_response(response)
             collectgarbage()
+            if headers["encrypted"] == "true" then
+                local decrypted = aes.decrypt("password", response_payload, aes.AES128, aes.CBCMODE)
+                response_payload = decrypted
+                collectgarbage()
+            end
             return result, headers, response_payload
         end
     end;
