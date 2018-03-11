@@ -21,6 +21,9 @@ local MESSAGE_ID_COUNTER = 0
 local BACK_OFF_TIME = 0
 local BACK_OFF_UNTIL = 0
 
+local HTTP_REPORTER_RUNNING_VERSION
+local HTTP_REPORTER_IMEI
+
 local DataQueue = {}
 DataQueue.__index = DataQueue -- failed table lookups on the instances should fallback to the class table, to get methods
 
@@ -47,10 +50,16 @@ function DataQueue:add_message(call_back, message, headers, host, port, path, en
     payload["host"] = host
     payload["port"] = port
     payload["path"] = path
-    payload["headers"] = headers
     payload["encrypt"] = encrypt
     payload["call_back"] = call_back
     payload["failure_count"] = 0
+    if headers == nil then
+        headers = {}
+    end
+    headers["version"] = HTTP_REPORTER_RUNNING_VERSION
+    headers["imei"] = HTTP_REPORTER_IMEI
+    payload["headers"] = headers
+
     logger(0, "Adding message to queue: ", payload)
     thread.enter_cs(REPORTER_CRITICAL_SECTION)
     self.data_list:push_left(payload)
@@ -180,7 +189,9 @@ local function http_reporter_thread_wrapper()
     end
 end
 
-local function start_thread()
+local function start_thread(imei, running_version)
+    HTTP_REPORTER_IMEI = imei
+    HTTP_REPORTER_RUNNING_VERSION = running_version
     local http_reporter_thread = thread.create(http_reporter_thread_wrapper)
     local running = thread.run(http_reporter_thread)
     REPORTER_THREAD = http_reporter_thread

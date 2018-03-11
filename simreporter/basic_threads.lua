@@ -1,21 +1,16 @@
 local _M = {}
 
-local tcp = require("tcp_client")
 local encaps = require("encapsulation")
 local at = require("at_commands")
 local at_abs = require("at_abs")
 local device = require("device")
 local json = require("json")
-local unzip = require("unzip")
 local config = require("config")
 local firmware = require("firmware")
 local logging = require("logging")
-local keygen = require("keygen")
-local rsa = require("rsa_lib")
 local network_setup = require("network_setup")
 local socket_lib = require("socket_thread")
 local sms_lib = require("sms_lib")
-local system = require("system")
 local http_reporter = require("http_reporter")
 local event_farmer = require("event_farmer")
 local gpio_lib = require("gpio_lib")
@@ -26,8 +21,6 @@ local ati_string = at.get_device_info();
 local last_cell_report = 0;
 local last_gps_report = 0;
 local imei = at_abs.get_imei()
-local key = ""
-local enc_key = ""
 local EXTRA_INFO = {}
 local running_version;
 
@@ -297,12 +290,10 @@ local function cell_tick()
     while (true) do
         logger(10, "Cell data thread waking up");
         if last_cell_report_has_expired() then
-            --key_data["iv"] = rsa.bytes_to_num(keygen.create_key(128))
             for i=1,1 do
                 local cell_table = device.get_device_info_table()
                 cell_table["extra_info"] = EXTRA_INFO
                 cell_table["running_version"] = tostring(running_version)
-                --cell_table["key"] = rsa.num_to_hex(key)
                 local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, 1, 1)
                 -- message, headers, host, port, path, encrypt
                 http_reporter.add_message(
@@ -511,7 +502,7 @@ local start_threads = function (version)
     start_thread("socket_thread", socket_thread_f)
     start_thread("uart_read_thread", uart_read_thread_f)
 
-    local http_reporter_thread, running = http_reporter.start_thread()
+    local http_reporter_thread, running = http_reporter.start_thread(imei, running_version)
     logger(10, "HTTP reporter thread start result is ", running)
 
 

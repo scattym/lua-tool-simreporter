@@ -3,7 +3,6 @@
 --local socket = require("simsocket")
 local logging = require("logging")
 local aeslib = require("aes")
-local rsa = require("rsa_lib")
 local util = require("util")
 
 local _M = {}

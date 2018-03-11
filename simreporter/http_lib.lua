@@ -6,7 +6,6 @@
 -- To change this template use File | Settings | File Templates.
 --
 local logging = require("logging")
-local rsa = require("rsa_lib")
 local tcp = require("tcp_client")
 local aes = require("aes")
 local util = require("util")
@@ -103,6 +102,7 @@ local parse_http_response = function (buffer)
     return headers, payload
 end
 
+local add_
 
 local http_connect_send_close = function(client_id, host, port, path, data, headers, encrypt)
     if data == nil then
@@ -115,8 +115,8 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
         headers["encrypted"] = "true"
     end
     if encrypt and type(encrypt) == "table" and encrypt["key"] ~= nil and encrypt["enc_key"] ~= nil then
-        headers["iv"] = rsa.num_to_hex(encrypt["iv"])
-        headers["sk"] = rsa.num_to_hex(encrypt["enc_key"])
+        -- headers["iv"] = rsa.num_to_hex(encrypt["iv"])
+        -- headers["sk"] = rsa.num_to_hex(encrypt["enc_key"])
         headers["encrypted"] = "true"
     end
 
@@ -148,12 +148,13 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
         logger(20, "Length is ", payload_length)
         local http_preamble = make_http_headers(host, path, payload_length, headers)
         local result, response = tcp.send_data(client_id, host, port, http_preamble, payload)
-        logger(10, "Response is ", response)
+        logger(0, "Response is ", response)
         if( result and response ) then
             local headers, response_payload = parse_http_response(response)
             collectgarbage()
             if headers["encrypted"] == "true" then
                 local decrypted = aes.decrypt("password", response_payload, aes.AES128, aes.CBCMODE)
+                logger(10, "decrypted payload is ", decrypted)
                 response_payload = decrypted
                 collectgarbage()
             end
