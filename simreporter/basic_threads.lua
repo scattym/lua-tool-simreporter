@@ -14,6 +14,8 @@ local sms_lib = require("sms_lib")
 local http_reporter = require("http_reporter")
 local event_farmer = require("event_farmer")
 local gpio_lib = require("gpio_lib")
+local http_lib = require("http_lib")
+local keygen = require("keygen")
 
 local logger = logging.create("basic_threads", 30)
 
@@ -466,6 +468,13 @@ local start_threads = function (version)
         logger(30, "Battery level too low not starting threads.")
         vmsleep(30000)
     end
+
+    logger(30, "Starting key gen")
+    local message, enc_key = keygen.create_and_encrypt_key()
+    logger(30, "Done encrypting key")
+
+
+    http_lib.set_device_params(imei, running_version)
 
     device_setup()
     vmsleep(2000);

@@ -12,6 +12,14 @@ local util = require("util")
 
 local logger = logging.create("http_lib", 30)
 
+local HTL_IMEI
+local HTL_VERSION
+
+local set_device_params = function(imei, version)
+    HTL_IMEI = imei
+    HTL_VERSION = version
+end
+
 local make_http_headers = function(host, path, length, headers)
     logger(0, "Host is ", tostring(host));
     logger(0, "Path is ", tostring(path));
@@ -102,8 +110,6 @@ local parse_http_response = function (buffer)
     return headers, payload
 end
 
-local add_
-
 local http_connect_send_close = function(client_id, host, port, path, data, headers, encrypt)
     if data == nil then
         data = ""
@@ -113,11 +119,31 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
     end
     if encrypt and type(encrypt) == "boolean" and encrypt == true then
         headers["encrypted"] = "true"
+        logger(30, "getting random bytes")
+        local seed = aes.getRandomData(16)
+        logger(30, "Random bytes is ", seed)
+        headers["encrypted"] = "true"
+        headers["seed"] = aes.bytesToHex(seed)
+        logger(30, "As hex ", headers["seed"])
+        local clock = tostring(os.clock())
+        headers["c"] = tostring(clock)
+        local key = aes.seed_to_key(seed, HTL_IMEI, HTL_VERSION, clock)
+        logger(30, "Key is ", key)
+        headers["key"] = aes.toHexString(key)
+        logger(30, "As hex ", headers["key"])
+        headers["v"] = HTL_VERSION
+        headers["i"] = HTL_IMEI
     end
     if encrypt and type(encrypt) == "table" and encrypt["key"] ~= nil and encrypt["enc_key"] ~= nil then
         -- headers["iv"] = rsa.num_to_hex(encrypt["iv"])
         -- headers["sk"] = rsa.num_to_hex(encrypt["enc_key"])
+        local seed = aes.getRandomData(16)
         headers["encrypted"] = "true"
+        headers["seed"] = aes.bytesToHex(seed)
+        local key = aes.seed_to_key(seed)
+        headers["key"] = aes.bytesToHex(key)
+        headers["ver"] = HTL_VERSION
+        headers["imei"] = HTL_IMEI
     end
 
     local payload = ""
@@ -177,6 +203,7 @@ end
 local api = {
     synchronous_http_get = synchronous_http_get,
     http_connect_send_close = http_connect_send_close,
+    set_device_params = set_device_params,
 }
 
 return api

@@ -1,5 +1,7 @@
 local logging = require("logging")
+local aes = require("aes")
 local _M = {}
+
 
 --supported port for atctl.setport(...)
 _M.ATCTL_UART_PORT  = 1
@@ -20,6 +22,7 @@ local logger = logging.create("at_commands", 30)
 local run_command = function(cmd)
     logger(0, "Running command: ", cmd, "<<")
     logger(0, "Thread entering critical section");
+    aes.add_entropy(tostring(os.clock))
     thread.enter_cs(1);
     logger(0, "Thread in critical section");
     local echo_off = "ATE0\r\n"
@@ -40,6 +43,9 @@ local run_command = function(cmd)
     --receive response with 5000 ms time out
     rsp = sio.recv(5000)
     thread.leave_cs(1);
+    aes.add_entropy(tostring(os.clock)..return_string)
+    --aes.add_entropy(return_string)
+
     logger(0, "Thread out of critical section");
 
     return return_string;

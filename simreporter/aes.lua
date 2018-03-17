@@ -241,7 +241,7 @@ local function bytesToHex(bytes)
 	local hexBytes = ""
 
 	for i,byte in ipairs(bytes) do
-		hexBytes = hexBytes .. string.format("%02x ", byte)
+		hexBytes = hexBytes .. string.format("%02X", byte)
 	end
 
 	return hexBytes
@@ -333,29 +333,6 @@ local function sleepCheckIn()
     end
 end
 
-local function getRandomData(bytes)
-	local char, random, sleep, insert = string.char, math.random, sleepCheckIn, table.insert
-	local result = {}
-
-	for i=1,bytes do
-		insert(result, random(0,255))
-		if i % 10240 == 0 then sleep() end
-	end
-
-	return result
-end
-
-local function getRandomString(bytes)
-	local char, random, sleep, insert = string.char, math.random, sleepCheckIn, table.insert
-	local result = {}
-
-	for i=1,bytes do
-		insert(result, char(random(0,255)))
-		if i % 10240 == 0 then sleep() end
-	end
-
-	return table.concat(result)
-end
 
 return {
 	byteParity = byteParity,
@@ -370,11 +347,7 @@ return {
 	unpadByteString = unpadByteString,
 	xorIV = xorIV,
 	increment = increment,
-
 	sleepCheckIn = sleepCheckIn,
-
-	getRandomData = getRandomData,
-	getRandomString = getRandomString,
 }
 end)
 aes=_W(function(_ENV, ...)
@@ -883,6 +856,7 @@ return {
 	expandDecryptionKey = expandDecryptionKey,
 	encrypt = encrypt,
 	decrypt = decrypt,
+    getRandomData = util.getRandomData,
 }
 end)
 local buffer=_W(function(_ENV, ...)
@@ -1145,8 +1119,6 @@ local function encrypt(password, data, keyLength, mode, iv)
 end
 _M.encrypt = encrypt
 
-
-
 --
 -- Decrypts string data with password password.
 -- password  - the decryption key is generated from this string
@@ -1186,5 +1158,78 @@ local function decrypt(password, data, keyLength, mode, iv)
 	return result
 end
 _M.decrypt = decrypt
+
+local function getRandomBytes(bytes)
+	local char, random, sleep, insert = string.char, math.random, sleepCheckIn, table.insert
+	local result = {}
+
+	for i=1,bytes do
+		insert(result, random(0,255))
+	end
+
+	return result
+end
+_M.getRandomBytes = getRandomBytes
+
+local RANDOM_ENTROPY
+
+local function add_entropy(entropy)
+    if RANDOM_ENTROPY == nil then
+        local start_value = _M.getRandomBytes(32)
+        RANDOM_ENTROPY = start_value
+    end
+    local RANDOM_HASHER = sha256.sum(tostring(os.clock()) .. util.toHexString(RANDOM_ENTROPY) .. tostring(entropy) .. tostring(os.clock()))
+    -- RANDOM_HASHER:update(tostring(entropy))
+    RANDOM_ENTROPY = RANDOM_HASHER
+end
+_M.add_entropy = add_entropy
+
+local function getRandomData(bytes)
+    add_entropy(tostring(os.clock()))
+	local char, random, sleep, insert = string.char, math.random, util.sleepCheckIn, table.insert
+	local result = {}
+
+	for i=1,bytes do
+        local random_byte = random(1,32)
+		insert(result, RANDOM_ENTROPY[random_byte])
+		if i % 10240 == 0 then sleep() end
+	end
+
+	return result
+end
+_M.getRandomData = getRandomData
+
+local function getRandomString(bytes)
+	local char, random, sleep, insert = string.char, math.random, util.sleepCheckIn, table.insert
+	local result = {}
+
+	for i=1,bytes do
+		insert(result, char(random(0,255)))
+		if i % 10240 == 0 then sleep() end
+	end
+
+	return table.concat(result)
+end
+
+local function getRandomDataHex(bytes)
+    local bytes = getRandomData(bytes)
+    return util.bytesToHex(bytes)
+end
+_M.getRandomDataHex = getRandomDataHex
+
+local function seed_to_key(seed, imei, version, os_clock)
+    local hash = sha256.init()
+    hash:update(util.toHexString(seed))
+    hash:update(imei)
+    hash:update(version)
+    hash:update(os_clock)
+    local checksum = hash:final()
+    local checksum_hex = util.toHexString(checksum)
+    return checksum
+end
+_M.seed_to_key = seed_to_key
+
+_M.bytesToHex = util.bytesToHex
+_M.toHexString = util.toHexString
 
 return _M

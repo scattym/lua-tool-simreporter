@@ -275,7 +275,7 @@ local save_config_to_file = function()
     if not file then
         logger.log("config", 30, "Unable to open config file for writing")
     else
-        -- file:trunc(0)
+        file:trunc(0)
         -- Checksum should always be correct, could remove the following
         checksum = calc_checksum(CONFIG)
         set_config_value("checksum", checksum, false)
