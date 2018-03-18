@@ -969,7 +969,9 @@ function public.decryptString(key, data, modeFunction, iv)
 		iv = ivCopy
 	else
 		iv = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-	end
+    end
+
+    logger(30, "Key hex is ", util.toHexString(key))
 
 	local keySched
 	if modeFunction == public.decryptOFB or modeFunction == public.decryptCFB or modeFunction == public.decryptCTR then
@@ -1051,12 +1053,18 @@ _M.CFBMODE = 4
 _M.CTRMODE = 5
 
 local function pwToKey(password, keyLength, iv)
-	local hash = sha256.init()
-	hash:update(password)
-    local checksum = hash:final()
-	--local checksum = "AAAAAAAAAAAAAAAA"
-    --logger(0, "Checksum is: ", util.tohex(checksum))
-	return {string.byte(checksum,1,keyLength)}
+    --return password
+    if sha256 then
+        logger(30, "calculating")
+        local hash = sha256.init()
+        hash:update(password)
+        local checksum = hash:final()
+        --local checksum = "AAAAAAAAAAAAAAAA"
+        --logger(0, "Checksum is: ", util.tohex(checksum))
+        return { string.byte(checksum,1,keyLength) }
+    else
+        return util.hexToBytes("5E884898DA28047151D0E56F8DC62927")
+    end
 --[[
 	local padLength = keyLength
 	if (keyLength == _M.AES192) then
@@ -1080,6 +1088,7 @@ local function pwToKey(password, keyLength, iv)
 	return {string.byte(password,1,#password)}]]--
 end
 
+
 --
 -- Encrypts string data with password password.
 -- password  - the encryption key is generated from this string
@@ -1089,8 +1098,7 @@ end
 --
 -- mode and keyLength must be the same for encryption and decryption.
 --
-local function encrypt(password, data, keyLength, mode, iv)
-	assert(password ~= nil, "Empty password.")
+local function encrypt_raw_key(key, data, keyLength, mode, iv)
 	assert(data ~= nil, "Empty data.")
     -- logger(0, "Password: ", password)
     logger(0, "data length ", #data, " data: ", data)
@@ -1098,7 +1106,11 @@ local function encrypt(password, data, keyLength, mode, iv)
 	local mode = mode or _M.CBCMODE
 	local keyLength = keyLength or _M.AES128
 
-	local key = pwToKey(password, keyLength, iv)
+    if type(key) == "string" then
+        key = { string.byte(key, 1,-1) }
+    end
+    print("Type of key is now ", type(key))
+
 	local paddedData = util.padByteString(data)
     --logger(0, "padded data length ", #paddedData)
 
@@ -1117,6 +1129,26 @@ local function encrypt(password, data, keyLength, mode, iv)
 		error("Unknown mode", 2)
 	end
 end
+_M.encrypt_raw_key = encrypt_raw_key
+
+--
+-- Encrypts string data with password password.
+-- password  - the encryption key is generated from this string
+-- data      - string to encrypt (must not be too large)
+-- keyLength - length of aes key: 128(default), 192 or 256 Bit
+-- mode      - mode of encryption: ecb, cbc(default), ofb, cfb
+--
+-- mode and keyLength must be the same for encryption and decryption.
+--
+local function encrypt(password, data, keyLength, mode, iv)
+
+	assert(password ~= nil, "Empty password.")
+	assert(data ~= nil, "Empty data.")
+    -- logger(0, "Password: ", password)
+    logger(0, "data length ", #data, " data: ", data)
+    local key = pwToKey(password, keyLength, iv)
+    return encrypt_raw_key(key, data, keyLength, mode, iv)
+end
 _M.encrypt = encrypt
 
 --
@@ -1128,11 +1160,14 @@ _M.encrypt = encrypt
 --
 -- mode and keyLength must be the same for encryption and decryption.
 --
-local function decrypt(password, data, keyLength, mode, iv)
+local function decrypt_raw_key(key, data, keyLength, mode, iv)
 	local mode = mode or _M.CBCMODE
 	local keyLength = keyLength or _M.AES128
 
-	local key = pwToKey(password, keyLength, iv)
+    if type(key) == "string" then
+        key = { string.byte(key, 1,-1) }
+    end
+    -- print("Type of key is now ", type(key))
     --logger(0, "Key: ", util.tohex(key))
 	local plain
 	if mode == _M.ECBMODE then
@@ -1149,7 +1184,7 @@ local function decrypt(password, data, keyLength, mode, iv)
 		error("Unknown mode", 2)
 	end
 	--print(plain)
-	result = util.unpadByteString(plain)
+	local result = util.unpadByteString(plain)
 
 	if (result == nil) then
 		return nil
@@ -1157,7 +1192,24 @@ local function decrypt(password, data, keyLength, mode, iv)
 
 	return result
 end
+_M.decrypt_raw_key = decrypt_raw_key
+
+--
+-- Decrypts string data with password password.
+-- password  - the decryption key is generated from this string
+-- data      - string to encrypt
+-- keyLength - length of aes key: 128(default), 192 or 256 Bit
+-- mode      - mode of decryption: ecb, cbc(default), ofb, cfb
+--
+-- mode and keyLength must be the same for encryption and decryption.
+--
+local function decrypt(password, data, keyLength, mode, iv)
+    local key = pwToKey(password, keyLength, iv)
+    -- print(type(key))
+    return decrypt_raw_key(key, data, keyLength, mode, iv)
+end
 _M.decrypt = decrypt
+
 
 local function getRandomBytes(bytes)
 	local char, random, sleep, insert = string.char, math.random, sleepCheckIn, table.insert
@@ -1178,21 +1230,27 @@ local function add_entropy(entropy)
         local start_value = _M.getRandomBytes(32)
         RANDOM_ENTROPY = start_value
     end
-    local RANDOM_HASHER = sha256.sum(tostring(os.clock()) .. util.toHexString(RANDOM_ENTROPY) .. tostring(entropy) .. tostring(os.clock()))
-    -- RANDOM_HASHER:update(tostring(entropy))
-    RANDOM_ENTROPY = RANDOM_HASHER
+    if sha256 then
+        local RANDOM_HASHER = sha256.sum(tostring(os.clock()) .. util.toHexString(RANDOM_ENTROPY) .. tostring(entropy) .. tostring(os.clock()))
+        -- RANDOM_HASHER:update(tostring(entropy))
+        RANDOM_ENTROPY = RANDOM_HASHER
+    else
+        RANDOM_ENTROPY = table.concat(util.hexToBytes("1122334455667788112233445566778811223344556677881122334455667788"))
+        -- print(type(RANDOM_ENTROPY))
+    -- logger(30, "Random entropy is ", util.toHexString(RANDOM_ENTROPY))
+    end
 end
 _M.add_entropy = add_entropy
 
 local function getRandomData(bytes)
-    add_entropy(tostring(os.clock()))
-	local char, random, sleep, insert = string.char, math.random, util.sleepCheckIn, table.insert
 	local result = {}
+    if RANDOM_ENTROPY == nil then
+        add_entropy(os.clock())
+    end
 
 	for i=1,bytes do
-        local random_byte = random(1,32)
-		insert(result, RANDOM_ENTROPY[random_byte])
-		if i % 10240 == 0 then sleep() end
+        local random_byte = math.random(1,32)
+		table.insert(result, RANDOM_ENTROPY:sub(random_byte, random_byte))
 	end
 
 	return result
@@ -1200,16 +1258,12 @@ end
 _M.getRandomData = getRandomData
 
 local function getRandomString(bytes)
-	local char, random, sleep, insert = string.char, math.random, util.sleepCheckIn, table.insert
-	local result = {}
-
-	for i=1,bytes do
-		insert(result, char(random(0,255)))
-		if i % 10240 == 0 then sleep() end
-	end
-
-	return table.concat(result)
+    local data = getRandomData(bytes)
+    logger(30, "data is ", data)
+    logger(30, "concat is ", table.concat(data))
+	return table.concat(data)
 end
+_M.getRandomString = getRandomString
 
 local function getRandomDataHex(bytes)
     local bytes = getRandomData(bytes)
@@ -1218,18 +1272,23 @@ end
 _M.getRandomDataHex = getRandomDataHex
 
 local function seed_to_key(seed, imei, version, os_clock)
-    local hash = sha256.init()
-    hash:update(util.toHexString(seed))
-    hash:update(imei)
-    hash:update(version)
-    hash:update(os_clock)
-    local checksum = hash:final()
-    local checksum_hex = util.toHexString(checksum)
-    return checksum
+    if sha256 then
+        local hash = sha256.init()
+        hash:update(util.toHexString(seed))
+        hash:update(imei)
+        hash:update(version)
+        hash:update(os_clock)
+        local checksum = hash:final()
+        local checksum_hex = util.toHexString(checksum)
+        return checksum
+    else
+        return "5e884898da28047151d0e56f8dc62927"
+    end
 end
 _M.seed_to_key = seed_to_key
 
 _M.bytesToHex = util.bytesToHex
 _M.toHexString = util.toHexString
+_M.hexToBytes = util.hexToBytes
 
 return _M

@@ -119,31 +119,17 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
     end
     if encrypt and type(encrypt) == "boolean" and encrypt == true then
         headers["encrypted"] = "true"
-        logger(30, "getting random bytes")
-        local seed = aes.getRandomData(16)
-        logger(30, "Random bytes is ", seed)
-        headers["encrypted"] = "true"
-        headers["seed"] = aes.bytesToHex(seed)
-        logger(30, "As hex ", headers["seed"])
-        local clock = tostring(os.clock())
-        headers["c"] = tostring(clock)
-        local key = aes.seed_to_key(seed, HTL_IMEI, HTL_VERSION, clock)
-        logger(30, "Key is ", key)
-        headers["key"] = aes.toHexString(key)
-        logger(30, "As hex ", headers["key"])
-        headers["v"] = HTL_VERSION
-        headers["i"] = HTL_IMEI
     end
-    if encrypt and type(encrypt) == "table" and encrypt["key"] ~= nil and encrypt["enc_key"] ~= nil then
+    if encrypt and type(encrypt) == "table" and encrypt["ki"] ~= nil and encrypt["key"] ~= nil then
         -- headers["iv"] = rsa.num_to_hex(encrypt["iv"])
         -- headers["sk"] = rsa.num_to_hex(encrypt["enc_key"])
         local seed = aes.getRandomData(16)
         headers["encrypted"] = "true"
-        headers["seed"] = aes.bytesToHex(seed)
+        headers["ki"] = aes.bytesToHex(seed)
         local key = aes.seed_to_key(seed)
         headers["key"] = aes.bytesToHex(key)
         headers["ver"] = HTL_VERSION
-        headers["imei"] = HTL_IMEI
+        headers["i"] = HTL_IMEI
     end
 
     local payload = ""
@@ -179,6 +165,7 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
             local headers, response_payload = parse_http_response(response)
             collectgarbage()
             if headers["encrypted"] == "true" then
+                logger(10, "Encrypted hex payload is ", aes.toHexString(response_payload))
                 local decrypted = aes.decrypt("password", response_payload, aes.AES128, aes.CBCMODE)
                 logger(10, "decrypted payload is ", decrypted)
                 response_payload = decrypted

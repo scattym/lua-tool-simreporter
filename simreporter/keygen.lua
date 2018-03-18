@@ -3,6 +3,9 @@ local _M = {}
 
 local logging = require("logging")
 local rsa = require("rsa_lib")
+local aes = require("aes")
+local json = require("json")
+local util = require("util")
 local logger = logging.create("keygen", 30)
 
 local modulus = "0099e9d73b5ce5ae593212223a25e3"..
@@ -15,32 +18,41 @@ local modulus = "0099e9d73b5ce5ae593212223a25e3"..
 "df57043b221ef6d935370b4c1baf06"..
 "e241c06b78204ed527"
 
-local create_key = function(bits)
-    local bytes = math.floor(bits / 8)
-    local key = ""
-    for i=1,bytes do
-        key = key .. string.char(math.random(0,255))
-    end
-
-    return key
+local function bytestostring(bytes, bytes_length)
+  local s = ""
+  for i = 1, bytes_length do
+    s = s .. string.byte(bytes[i]) -- '..' create new string. Expensive!!
+  end
+  return s
 end
-_M.create_key = create_key
 
-local create_and_encrypt_key = function(bits)
-    local key = create_key(128)
+local create_and_encrypt_key = function(imei, bytes)
+    local raw_key = aes.getRandomString(bytes)
+    -- logger(30, "Raw key is", aes.toHexString(raw_key))
+    local key_encoded = base64.encode(raw_key)
+    local random_encoded = base64.encode(aes.getRandomString(bytes))
     logger(30, "Key generation complete.")
-    local message = rsa.bytes_to_num(key) -- message is the key
-    logger(30, "Key is " .. rsa.num_to_hex(message))
+
+    local login_message = {}
+    login_message["r"] = tostring(random_encoded)
+    login_message["i"] = tostring(imei)
+    login_message["sk"] = tostring(key_encoded)
+    local json_message = json.encode(login_message)
+    logger(30, "json message raw ", json_message)
+
+    local message = rsa.bytes_to_num(json_message) -- message is the key
+    logger(30, "json message hex is " .. rsa.num_to_hex(message))
     logger(30, "Calculated message as big int: " .. tostring(message))
     local exponent = rsa.hex_to_num("10001")
     logger(30, "Calculated exponent")
     local n_modulus = rsa.hex_to_num(modulus)
     logger(30, "Calculated modulus")
 
-    local enc_key = rsa.mod_power(message, exponent, n_modulus)
-    logger(30, "Encrypted key: ", rsa.num_to_hex(enc_key))
+    local enc_login_message = rsa.mod_power(message, exponent, n_modulus)
+    logger(30, "Encrypted key: ", rsa.num_to_hex(enc_login_message))
 
-    return message, enc_key
+    local raw_key_bytes = { string.byte(raw_key, 1,-1) }
+    return raw_key_bytes, rsa.num_to_hex(enc_login_message)
 end
 _M.create_and_encrypt_key = create_and_encrypt_key
 

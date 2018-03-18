@@ -163,11 +163,28 @@ end
 _M.print_simple_table = print_simple_table
 
 local tohex = function(data)
-    return (data:gsub(".", function (x)
-        return ("%02x"):format(x:byte()) end)
-    )
+    if type(data) == "string" then
+        return (data:gsub(".", function (x)
+            return ("%02x"):format(x:byte()) end)
+        )
+    else
+	    local hexBytes = ""
+
+        for i,byte in ipairs(data) do
+            hexBytes = hexBytes .. string.format("%02X", byte)
+        end
+
+        return hexBytes
+    end
 end
 _M.tohex = tohex
+
+local function fromhex(data)
+    return (data:gsub('..', function (cc)
+        return string.char(tonumber(cc, 16))
+    end))
+end
+_M.fromhex = fromhex
 
 
 return _M

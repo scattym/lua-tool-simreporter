@@ -11,8 +11,11 @@ local logging = require("logging")
 local list = require("list")
 local http_lib = require("http_lib")
 local config = require("config")
+local json = require("json")
+local util = require("util")
+local aes = require("aes")
 
-local logger = logging.create("http_reporter", 30)
+local logger = logging.create("http_reporter", 0)
 
 local REPORTER_THREAD
 local REPORTER_CLIENT_ID = config.get_config_value("NET_CLIENT_ID_HTTP_REPORTER")
@@ -23,6 +26,8 @@ local BACK_OFF_UNTIL = 0
 
 local HTTP_REPORTER_RUNNING_VERSION
 local HTTP_REPORTER_IMEI
+local SESSION_KEY
+local LOGIN_PAYLOAD
 
 local DataQueue = {}
 DataQueue.__index = DataQueue -- failed table lookups on the instances should fallback to the class table, to get methods
@@ -98,8 +103,37 @@ end
 
 local DATA_QUEUE = DataQueue(200)
 
+local function login()
+    logger(30, "Payload as hex is ", LOGIN_PAYLOAD)
+    local as_str = util.fromhex(LOGIN_PAYLOAD)
+    local result, headers, response = http_lib.http_connect_send_close(
+        REPORTER_CLIENT_ID,
+        config.get_config_value("UPDATE_HOST"),
+        config.get_config_value("UPDATE_PORT"),
+        "/v3/login",
+        as_str,
+        {}
+    )
+    if( not result or not string.equal(headers["response_code"], "200") ) then
+        logger(30, "Login failed. Result was: ", result, " and response code: ", headers["response_code"])
+    else
+        logger(30, "Login sucessful. Result was: ", result, " and response code: ", headers["response_code"])
+        local decrypted = aes.decrypt_raw_key(SESSION_KEY, response, aes.AES128, aes.CBCMODE)
+        if decrypted then
+            local response_table = json.decode(decrypted)
+            if response_table then
+                local uuid = response_table["uuid"]
+                logger(30, "uuid is ", uuid)
+            end
+        end
+    end
+end
+
+
 local function http_reporter_thread_f()
     local key_data = true
+
+    login()
 
     while true do
         -- local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(1000000)
@@ -189,9 +223,11 @@ local function http_reporter_thread_wrapper()
     end
 end
 
-local function start_thread(imei, running_version)
+local function start_thread(imei, running_version, key, login_payload)
     HTTP_REPORTER_IMEI = imei
     HTTP_REPORTER_RUNNING_VERSION = running_version
+    SESSION_KEY = key
+    LOGIN_PAYLOAD = login_payload
     local http_reporter_thread = thread.create(http_reporter_thread_wrapper)
     local running = thread.run(http_reporter_thread)
     REPORTER_THREAD = http_reporter_thread

@@ -16,6 +16,7 @@ local event_farmer = require("event_farmer")
 local gpio_lib = require("gpio_lib")
 local http_lib = require("http_lib")
 local keygen = require("keygen")
+local aes = require("aes")
 
 local logger = logging.create("basic_threads", 30)
 
@@ -469,8 +470,14 @@ local start_threads = function (version)
         vmsleep(30000)
     end
 
+    logger(30, "##########################################################################################")
+    local x = sha256.sum("test")
+    logger(30, type(x))
+    logger(30, x)
+
+    logger(30, decrypted)
     logger(30, "Starting key gen")
-    local message, enc_key = keygen.create_and_encrypt_key()
+    local session_key, enc_login_message = keygen.create_and_encrypt_key(imei, 16)
     logger(30, "Done encrypting key")
 
 
@@ -496,6 +503,9 @@ local start_threads = function (version)
         firmware.check_firmware_and_maybe_update(imei, running_version)
     end
 
+    local http_reporter_thread, running = http_reporter.start_thread(imei, running_version, session_key, enc_login_message)
+    logger(10, "HTTP reporter thread start result is ", running)
+
     event_farmer.add_event_handler(0, gpio_lib.gpio_event_handler_cb)
     -- Set pin 42 to default high, level triggered, trigger on low and save
     gpio_lib.add_gpio_handler(42, 0, 0, 1, 1, gpio_handler)
@@ -510,10 +520,6 @@ local start_threads = function (version)
     start_thread("sms_processor", start_sms_thread)
     start_thread("socket_thread", socket_thread_f)
     start_thread("uart_read_thread", uart_read_thread_f)
-
-    local http_reporter_thread, running = http_reporter.start_thread(imei, running_version)
-    logger(10, "HTTP reporter thread start result is ", running)
-
 
     start_thread("gpio_handler", gpio_lib.gpio_handler_thread_wrapper)
     start_thread("event_handler", event_farmer.event_handler_thread_wrapper)
