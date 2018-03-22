@@ -417,7 +417,7 @@ local function start_sms_thread()
 
     while true do
         pcall(sms_lib.wait_for_sms_thread, imei)
-        logger(30, "SMS function exitied. Sleeping before restart")
+        logger(30, "SMS function exited. Sleeping before restart")
         thread.sleep(10000)
     end
 end
