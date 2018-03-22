@@ -64,6 +64,7 @@ local function gpio_event_handler_cb(evt, evt_p1, evt_p2, evt_p3, evt_clock)
 end
 
 local function gpio_handler_thread_f()
+    GPIO_HANDLER_THREAD = thread.identity()
     while true do
         -- local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(1000000)
         local waited_mask = thread.signal_wait(255, 1000000)

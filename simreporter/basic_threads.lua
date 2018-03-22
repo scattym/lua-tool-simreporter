@@ -509,6 +509,7 @@ local start_threads = function (version)
     event_farmer.add_event_handler(0, gpio_lib.gpio_event_handler_cb)
     -- Set pin 42 to default high, level triggered, trigger on low and save
     gpio_lib.add_gpio_handler(42, 0, 0, 1, 1, gpio_handler)
+    gpio_lib.add_gpio_handler(5, 0, 0, 1, 1, gpio_handler)
 
     logger(10, "Start of start_threads")
     start_thread("config_update", get_config)
