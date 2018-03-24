@@ -12,7 +12,7 @@ local list = require("list")
 local http_lib = require("http_lib")
 local config = require("config")
 
-local logger = logging.create("gpio", 0)
+local logger = logging.create("gpio", 30)
 
 local GPIO_HANDLER_THREAD
 local CRITICAL_SECTION_GPIO_HANDLER = config.get_config_value("CRITICAL_SECTION_GPIO_HANDLER")

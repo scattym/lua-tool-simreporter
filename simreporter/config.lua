@@ -28,8 +28,9 @@ CONFIG["MQ_HOST"] = "services.scattym.com"
 CONFIG["MQ_PORT"] = 65534
 CONFIG["SOCK_HOST"] = "services.scattym.com"
 CONFIG["SOCK_PORT"] = 65533
-CONFIG["CELL_PATH"] = "/v2/process_cell_update"
-CONFIG["GPS_PATH"] = "/v2/process_update"
+CONFIG["CELL_PATH"] = "/v3/process_cell_update"
+CONFIG["GPS_PATH"] = "/v3/process_update"
+CONFIG["EVENT_PATH"] = "/v3/process_event"
 CONFIG["CONFIG_SLEEP_TIME"] = 30000
 CONFIG["REPORT_FLAGS"] = 0xFFFFFFFF
 CONFIG["ENABLE_TCP"] = "false"
@@ -56,6 +57,8 @@ CONFIG["MAX_HTTP_REPORTER_SEND_ATTEMPTS"] = 3
 CONFIG["MAX_HTTP_REPORTER_PAYLOAD_ATTEMPTS"] = 100
 CONFIG["MAX_CONFIG_ON_BOOT_CALLOUTS"] = 5
 CONFIG["USE_SESSION_KEY"] = "true"
+CONFIG["PIN_IGNITION"] = 5
+CONFIG["PIN_SOS"] = 42
 
 -------- global vars --------
 CONFIG["NET_CLIENT_ID_GPS"] = 1
@@ -114,6 +117,8 @@ local MUST_BE_INTS = {
     "SOCK_HEARTBEAT_INTERVAL",
     "MAX_CARD_READ_SEND_ATTEMPTS",
     "MAX_GPIO_EVENT_BACKLOG",
+    "PIN_IGNITION",
+    "PIN_SOS",
 }
 
 local MUST_BE_STRING = {
@@ -133,6 +138,7 @@ local MUST_BE_STRING = {
     "SHOULD_REBOOT",
     "CARD_READ_PATH",
     "USE_SESSION_KEY",
+    "EVENT_PATH",
 }
 
 local MUST_BE_BOOLEAN = {

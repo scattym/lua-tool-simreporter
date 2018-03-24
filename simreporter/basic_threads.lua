@@ -39,6 +39,8 @@ local CRITICAL_SECTION_REPORTER = 8
 
 local WAIT_EVENT_SOCKET_SEND = 40
 local WAIT_EVENT_MESSAGE_QUEUE = 39
+local THREAD_LIST = {}
+
 
 local card_reader_send_thread
 
@@ -437,11 +439,74 @@ local function device_setup()
     network_setup.set_network_from_sms_operator();
 end
 
-local function gpio_handler(pin, state, clock)
-    logger(30, "Pin: ", pin, " state: ", state, " clock: ", clock)
+local function engine_monitor_thread_f()
+    local last_change
+    local wait_time = 1000000
+    local gpio_state
+
+    while true do
+        local waited_mask = thread.signal_wait(255, wait_time)
+        if waited_mask > 0 then
+            gpio_state = gpio.getv(config.get_config_value("PIN_IGNITION"))
+            logger(30, "GPIO state is currently", gpio_state)
+            logger(30, "Setting wait time to 1 second")
+            last_change = os.clock()
+            wait_time = 1000
+        else
+            if last_change > 0 and (last_change - os.clock()) > 10 then
+                gpio_state = gpio.getv(config.get_config_value("PIN_IGNITION"))
+                logger(30, "GPIO state is currently", gpio_state)
+                -- thread.sleep(5000)
+                gpio_state = gpio.getv(config.get_config_value("PIN_IGNITION"))
+                logger(30, "GPIO state is now", gpio_state)
+                local payload = {}
+                if gpio_state == 1 then
+                    payload["engine"] = "start"
+                else
+                    payload["engine"] = "stop"
+                end
+                local encapsulated_payload = encaps.encapsulate_data(ati_string, payload);
+                http_reporter.add_message(
+                    nil,
+                    encapsulated_payload,
+                    {},
+                    config.get_config_value("UPDATE_HOST"),
+                    config.get_config_value("UPDATE_PORT"),
+                    config.get_config_value("EVENT_PATH"),
+                    true
+                )
+                wait_time = 1000000
+                last_change = 0
+            end
+        end
+    end
 end
 
-local THREAD_LIST = {}
+local function gpio_handler(pin, state, clock)
+    logger(30, "Pin: ", pin, " state: ", state, " clock: ", clock)
+    logger(30, "Pin type is ", type(pin))
+    logger(30, "State type is ", type(state))
+    local payload = {}
+    if pin == config.get_config_value("PIN_IGNITION") then
+        if THREAD_LIST["engine_monitor_thread"] ~= nil then
+            thread.signal_notify(THREAD_LIST["engine_monitor_thread"], pin)
+        end
+    elseif pin == config.get_config_value("PIN_SOS") then
+        payload["sos"] = state
+        local encapsulated_payload = encaps.encapsulate_data(ati_string, payload);
+        http_reporter.add_message(
+            nil,
+            encapsulated_payload,
+            {},
+            config.get_config_value("UPDATE_HOST"),
+            config.get_config_value("UPDATE_PORT"),
+            config.get_config_value("EVENT_PATH"),
+            true
+        )
+    end
+
+end
+
 local function start_thread(name, thread_func)
     local thread_ptr = thread.create(thread_func)
     logger(10, "Thread: ", name, " has id: ", thread_ptr)
@@ -518,6 +583,7 @@ local start_threads = function (version)
     start_thread("sms_processor", start_sms_thread)
     start_thread("socket_thread", socket_thread_f)
     start_thread("uart_read_thread", uart_read_thread_f)
+    start_thread("engine_monitor_thread", engine_monitor_thread_f)
 
     start_thread("gpio_handler", gpio_lib.gpio_handler_thread_wrapper)
     start_thread("event_handler", event_farmer.event_handler_thread_wrapper)
