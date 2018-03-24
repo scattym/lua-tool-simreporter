@@ -35,10 +35,7 @@ local function encode_strings(table)
 end
 
 local encapsulate_data = function(device_info, table_data, iteration, count)
-    table_data["version"] = "1"
     table_data["device_info"] = device_info
-    table_data["packet_number"] = iteration
-    table_data["packet_count"] = count
     encode_strings(table_data)
     return json.encode(table_data)
     --[[local data = ""
