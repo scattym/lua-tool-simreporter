@@ -440,8 +440,8 @@ local function device_setup()
 end
 
 local function engine_monitor_thread_f()
-    local last_change
-    local wait_time = 1000000
+    local last_change = 0
+    local wait_time = 10000000
     local gpio_state
 
     while true do

@@ -138,10 +138,13 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
 
         logger(0, "About to encrypt payload: ", data);
         collectgarbage()
+        logger(0, "Encrypt is ", encrypt)
 
-        if encrypt["key"] then
+        if type(encrypt) == "table" and encrypt["key"] then
+            logger(0, "Encrypting with key. IV", util.tohex(iv), " key ", util.tohex(encrypt["key"]))
             payload = aes.encrypt_raw_key(encrypt["key"], data, aes.AES128, aes.CBCMODE, iv)
         else
+            logger(0, "Encrypting with default")
             payload = aes.encrypt("password", data, aes.AES128, aes.CBCMODE)
         end
         logger(0, "Encrypted payload is ", util.tohex(payload))

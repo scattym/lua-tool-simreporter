@@ -29,6 +29,7 @@ local HTTP_REPORTER_IMEI
 local SESSION_KEY
 local LOGIN_PAYLOAD
 local SESSION_UUID
+local LOGGED_IN = false
 
 local DataQueue = {}
 DataQueue.__index = DataQueue -- failed table lookups on the instances should fallback to the class table, to get methods
@@ -113,27 +114,30 @@ local function login()
     if not LOGIN_PAYLOAD then
         logger(30, "No login payload. Login not possible.")
     else
-        logger(30, "Payload as hex is ", LOGIN_PAYLOAD)
-        local as_str = util.fromhex(LOGIN_PAYLOAD)
-        local result, headers, response = http_lib.http_connect_send_close(
-            REPORTER_CLIENT_ID,
-            config.get_config_value("UPDATE_HOST"),
-            config.get_config_value("UPDATE_PORT"),
-            "/v3/login",
-            as_str,
-            {}
-        )
-        if( not result or not string.equal(headers["response_code"], "200") ) then
-            logger(30, "Login failed. Result was: ", result, " and response code: ", headers["response_code"])
-        else
-            logger(30, "Login sucessful. Result was: ", result, " and response code: ", headers["response_code"])
-            local decrypted = aes.decrypt_raw_key(SESSION_KEY, response, aes.AES128, aes.CBCMODE)
-            if decrypted then
-                local response_table = json.decode(decrypted)
-                if response_table then
-                    local uuid = response_table["uuid"]
-                    logger(30, "uuid is ", uuid)
-                    SESSION_UUID = uuid
+        if not LOGGED_IN then
+            logger(30, "Payload as hex is ", LOGIN_PAYLOAD)
+            local as_str = util.fromhex(LOGIN_PAYLOAD)
+            local result, headers, response = http_lib.http_connect_send_close(
+                REPORTER_CLIENT_ID,
+                config.get_config_value("UPDATE_HOST"),
+                config.get_config_value("UPDATE_PORT"),
+                "/v3/login",
+                as_str,
+                {}
+            )
+            if( not result or not string.equal(headers["response_code"], "200") ) then
+                logger(30, "Login failed. Result was: ", result, " and response code: ", headers["response_code"])
+            else
+                logger(30, "Login sucessful. Result was: ", result, " and response code: ", headers["response_code"])
+                local decrypted = aes.decrypt_raw_key(SESSION_KEY, response, aes.AES128, aes.CBCMODE)
+                if decrypted then
+                    local response_table = json.decode(decrypted)
+                    if response_table then
+                        local uuid = response_table["uuid"]
+                        logger(30, "uuid is ", uuid)
+                        SESSION_UUID = uuid
+                        LOGGED_IN = true
+                    end
                 end
             end
         end
@@ -175,6 +179,7 @@ local function http_reporter_thread_f()
 
                 local max_attempts_exceeded = false
                 while DATA_QUEUE:length() > 0 and not max_attempts_exceeded do
+                    logger(0, "Getting message off of queue, queue length is ", DATA_QUEUE:length())
                     local message = DATA_QUEUE:get_message()
                     if message then
                         local headers = message["headers"]
@@ -204,6 +209,7 @@ local function http_reporter_thread_f()
                             failure_count = failure_count + 1
                             DATA_QUEUE:requeue_message(message)
                             if headers["response_code"] == "403" then
+                                LOGGED_IN = false
                                 break -- break back to login again
                             end
 
@@ -213,6 +219,7 @@ local function http_reporter_thread_f()
                         logger(30, "Data to send but no data returned. Object is: ", message)
                         failure_count = failure_count + 1
                     end
+                    logger(0, "About to check failure count")
                     if failure_count >= config.get_config_value("MAX_HTTP_REPORTER_SEND_ATTEMPTS") then
                         logger(30, "Too many failed attempts. Giving up for now. Failed count is: ", failure_count)
                         if BACK_OFF_TIME == 0 then
