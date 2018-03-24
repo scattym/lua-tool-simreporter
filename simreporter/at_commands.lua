@@ -224,6 +224,7 @@ _M.change_dir = change_dir
 
 local reset = function()
     response = run_command("AT+CRESET");
+    os.do_reset()
     return response;
 end;
 _M.reset = reset
