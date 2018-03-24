@@ -123,12 +123,8 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
 
     local iv = aes.getRandomData(16)
     if encrypt and type(encrypt) == "table" and encrypt["ki"] ~= nil and encrypt["key"] ~= nil then
-        -- headers["iv"] = rsa.num_to_hex(encrypt["iv"])
-        -- headers["sk"] = rsa.num_to_hex(encrypt["enc_key"])
         headers["iv"] = util.tohex(iv)
-        headers["encrypted"] = "true"
         headers["ki"] = encrypt["ki"]
-        headers["key"] = util.tohex(encrypt["key"])
         headers["ver"] = HTL_VERSION
         headers["i"] = HTL_IMEI
     end

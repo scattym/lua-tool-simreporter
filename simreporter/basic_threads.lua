@@ -20,12 +20,12 @@ local aes = require("aes")
 
 local logger = logging.create("basic_threads", 30)
 
-local ati_string = at.get_device_info();
+local ATI_STRING = at.get_device_info();
 local last_cell_report = 0;
 local last_gps_report = 0;
-local imei = at_abs.get_imei()
+local IMEI = at_abs.get_imei()
 local EXTRA_INFO = {}
-local running_version;
+local RUNNING_VERSION;
 
 local NET_CLIENT_ID_GPS = 1
 local NET_CLIENT_ID_CARD = 5
@@ -40,9 +40,6 @@ local CRITICAL_SECTION_REPORTER = 8
 local WAIT_EVENT_SOCKET_SEND = 40
 local WAIT_EVENT_MESSAGE_QUEUE = 39
 local THREAD_LIST = {}
-
-
-local card_reader_send_thread
 
 local function tohex(data)
     return (data:gsub(".", function (x)
@@ -232,9 +229,9 @@ local function gps_tick()
                     if config.get_config_value("REPORT_DEVICE_INFO_WITH_GPS") == "true" then
                         local cell_table = device.get_device_info_table();
                         cell_table["extra_info"] = EXTRA_INFO
-                        cell_table["running_version"] = tostring(running_version)
+                        cell_table["running_version"] = tostring(RUNNING_VERSION)
 
-                        local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
+                        local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, cell_table)
                         http_reporter.add_message(
                             nil,
                             encapsulated_payload,
@@ -255,7 +252,7 @@ local function gps_tick()
                         if config.get_config_value("REPORT_CELL_WITH_GPS") == "true" then
                             nmea_table["cell_info"] = at.get_cell_info()
                         end
-                        local encapsulated_payload = encaps.encapsulate_data(ati_string, nmea_table, current_loop, config.get_config_value("NMEA_LOOP_COUNT"));
+                        local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, nmea_table);
                         http_reporter.add_message(
                             nil,
                             encapsulated_payload,
@@ -298,8 +295,8 @@ local function cell_tick()
             for i=1,1 do
                 local cell_table = device.get_device_info_table()
                 cell_table["extra_info"] = EXTRA_INFO
-                cell_table["running_version"] = tostring(running_version)
-                local encapsulated_payload = encaps.encapsulate_data(ati_string, cell_table, 1, 1)
+                cell_table["running_version"] = tostring(RUNNING_VERSION)
+                local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, cell_table)
                 -- message, headers, host, port, path, encrypt
                 http_reporter.add_message(
                     nil,
@@ -323,11 +320,11 @@ end;
 
 local function get_firmware_version()
     logger(10, "Trying to retrieve firmware version");
-    logger(10, "imei: ", imei)
+    logger(10, "imei: ", IMEI)
     local client_id = 3;
     while (true) do
         if config.get_config_value("CHECK_FOR_FIRMWARE_IN_THREADS") == "true" then
-            firmware.check_firmware_and_maybe_reset(imei, running_version)
+            firmware.check_firmware_and_maybe_reset(IMEI, RUNNING_VERSION)
             collectgarbage()
         end
         thread.sleep(config.get_config_value("FIRMWARE_SLEEP_TIME"));
@@ -336,11 +333,11 @@ end
 
 local function get_config()
     logger(10, "Trying to retrieve config");
-    logger(10, "imei: ", imei)
-    logger(10, "imei: ", running_version)
+    logger(10, "imei: ", IMEI)
+    logger(10, "imei: ", RUNNING_VERSION)
 
     while (true) do
-        local config_result = config.load_config_from_server(imei, running_version)
+        local config_result = config.load_config_from_server(IMEI, RUNNING_VERSION)
         logger(10, "Config load result was: ", config_result)
         logger(10, "mem used: ", getcurmem())
         --config.dump_config()
@@ -371,7 +368,7 @@ local function handle_card_read_command(cmd_port, cmd_name, cmd_op, cmd_line, cm
     -- add_message(value)
     local data = {}
     data["card_read"] = value
-    local encapsulated_payload = encaps.encapsulate_data(ati_string, data, 0, 0)
+    local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, data, 0, 0)
     http_reporter.add_message(
         nil,
         encapsulated_payload,
@@ -409,7 +406,7 @@ end
 
 local function socket_thread_f()
     while true do
-        pcall(socket_lib.socket_thread, NET_CLIENT_ID_SOCKET, imei, running_version)
+        pcall(socket_lib.socket_thread, NET_CLIENT_ID_SOCKET, IMEI, RUNNING_VERSION)
         logger(30, "Socket function exited. Sleeping before restart")
         thread.sleep(10000)
     end
@@ -418,7 +415,7 @@ end
 local function start_sms_thread()
 
     while true do
-        pcall(sms_lib.wait_for_sms_thread, imei)
+        pcall(sms_lib.wait_for_sms_thread, IMEI)
         logger(30, "SMS function exited. Sleeping before restart")
         thread.sleep(10000)
     end
@@ -465,7 +462,7 @@ local function engine_monitor_thread_f()
                 else
                     payload["engine"] = "stop"
                 end
-                local encapsulated_payload = encaps.encapsulate_data(ati_string, payload);
+                local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, payload);
                 http_reporter.add_message(
                     nil,
                     encapsulated_payload,
@@ -493,7 +490,7 @@ local function gpio_handler(pin, state, clock)
         end
     elseif pin == config.get_config_value("PIN_SOS") then
         payload["sos"] = state
-        local encapsulated_payload = encaps.encapsulate_data(ati_string, payload);
+        local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, payload);
         http_reporter.add_message(
             nil,
             encapsulated_payload,
@@ -528,14 +525,14 @@ end
 
 
 local start_threads = function (version)
-    running_version = version;
+    RUNNING_VERSION = version;
 
     while get_battery_percent() < config.get_config_value("MIN_BAT_PERCENT_FOR_BOOT") do
         logger(30, "Battery level too low not starting threads.")
         vmsleep(30000)
     end
 
-    http_lib.set_device_params(imei, running_version)
+    http_lib.set_device_params(IMEI, RUNNING_VERSION)
 
     device_setup()
     vmsleep(2000);
@@ -543,7 +540,7 @@ local start_threads = function (version)
     local config_loaded = false
     while not config_loaded and config_attempts < config.get_config_value("MAX_CONFIG_ON_BOOT_CALLOUTS") do
         config_attempts = config_attempts + 1
-        config_loaded = config.load_config_from_server(imei, running_version)
+        config_loaded = config.load_config_from_server(IMEI, RUNNING_VERSION)
         if not config_loaded then
             logger(30, "Callout for config failed. Sleeping for 3 seconds before retrying.")
             vmsleep(3000)
@@ -554,18 +551,20 @@ local start_threads = function (version)
     end
 
     if config.get_config_value("CHECK_FOR_FIRMWARE_ON_BOOT") == "true" then
-        firmware.check_firmware_and_maybe_update(imei, running_version)
+        firmware.check_firmware_and_maybe_update(IMEI, RUNNING_VERSION)
     end
 
     local session_key
     local enc_login_message
     if config.get_config_value("USE_SESSION_KEY") == "true" then
         logger(0, "Starting key gen")
-        session_key, enc_login_message = keygen.create_and_encrypt_key(imei, 16)
+        session_key, enc_login_message = keygen.create_and_encrypt_key(IMEI, 16)
         logger(0, "Done encrypting key")
+        local login_result = http_reporter.login(IMEI, RUNNING_VERSION, session_key, enc_login_message)
+        logger(0, "Login result is ", login_result)
     end
 
-    local http_reporter_thread, running = http_reporter.start_thread(imei, running_version, session_key, enc_login_message)
+    local http_reporter_thread, running = http_reporter.start_thread(IMEI, RUNNING_VERSION, session_key, enc_login_message)
     logger(10, "HTTP reporter thread start result is ", running)
 
     event_farmer.add_event_handler(0, gpio_lib.gpio_event_handler_cb)

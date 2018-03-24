@@ -983,7 +983,7 @@ function public.decryptString(key, data, modeFunction, iv)
 		iv = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
     end
 
-    logger(30, "Key hex is ", util.toHexString(key))
+    logger(0, "Key hex is ", util.toHexString(key))
 
 	local keySched
 	if modeFunction == public.decryptOFB or modeFunction == public.decryptCFB or modeFunction == public.decryptCTR then
@@ -1077,27 +1077,6 @@ local function pwToKey(password, keyLength, iv)
     else
         return util.hexToBytes("5E884898DA28047151D0E56F8DC62927")
     end
---[[
-	local padLength = keyLength
-	if (keyLength == _M.AES192) then
-		padLength = 32
-	end
-
-	if (padLength > #password) then
-		local postfix = ""
-		for i = 1,padLength - #password do
-			postfix = postfix .. string.char(0)
-		end
-		password = password .. postfix
-	else
-		password = string.sub(password, 1, padLength)
-	end
-
-	local pwBytes = {string.byte(password,1,#password) }
-	password = ciphermode.encryptString(pwBytes, password, ciphermode.encryptCBC, iv)
-	password = string.sub(password, 1, keyLength)
-
-	return {string.byte(password,1,#password)}]]--
 end
 
 

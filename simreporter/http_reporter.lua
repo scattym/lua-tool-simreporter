@@ -110,11 +110,21 @@ end
 
 local DATA_QUEUE = DataQueue(200)
 
-local function login()
+local function login(imei, running_version, session_key, enc_login_message)
+    if imei and running_version and session_key and enc_login_message then
+        HTTP_REPORTER_IMEI = imei
+        HTTP_REPORTER_RUNNING_VERSION = running_version
+        SESSION_KEY = session_key
+        LOGIN_PAYLOAD = enc_login_message
+    end
     if not LOGIN_PAYLOAD then
         logger(30, "No login payload. Login not possible.")
+        return false
     else
-        if not LOGGED_IN then
+        if LOGGED_IN then
+            logger(0, "Already logged in")
+            return true
+        else
             logger(30, "Payload as hex is ", LOGIN_PAYLOAD)
             local as_str = util.fromhex(LOGIN_PAYLOAD)
             local result, headers, response = http_lib.http_connect_send_close(
@@ -127,6 +137,7 @@ local function login()
             )
             if( not result or not string.equal(headers["response_code"], "200") ) then
                 logger(30, "Login failed. Result was: ", result, " and response code: ", headers["response_code"])
+                return false
             else
                 logger(30, "Login sucessful. Result was: ", result, " and response code: ", headers["response_code"])
                 local decrypted = aes.decrypt_raw_key(SESSION_KEY, response, aes.AES128, aes.CBCMODE)
@@ -137,11 +148,14 @@ local function login()
                         logger(30, "uuid is ", uuid)
                         SESSION_UUID = uuid
                         LOGGED_IN = true
+                        return true
                     end
                 end
             end
         end
     end
+    logger(30, "End of login.")
+    return false
 end
 
 local function http_reporter_thread_f()
@@ -268,6 +282,7 @@ end
 local api = {
     add_message = add_message,
     start_thread = start_thread,
+    login = login,
     --synchronous_http_get = synchronous_http_get,
 }
 

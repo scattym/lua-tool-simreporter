@@ -4,6 +4,8 @@
 
 collectgarbage();
 os.printport(3)
+local MIN_BAT_LEVEL = 5
+local DEBUG_LEVEL = 10
 
 function prequire(...)
     local status, lib = pcall(require, ...)
@@ -23,13 +25,13 @@ function split(str, delim)
 end
 sio.clear()
 sio.send("AT+CFUN=0\r\n")
-DEBUG_LEVEL = 10
+local cfun_response = sio.recv(5000)
 vmsleep(7000);
 printdir(1);
 sio.clear()
 sio.send("ATE0\r\n")
-local MIN_BAT_LEVEL = 5
 local ate_response = sio.recv(5000)
+sio.clear()
 
 local function get_battery_level()
     local bat_percent = 0
