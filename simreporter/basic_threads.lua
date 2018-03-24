@@ -231,7 +231,7 @@ local function gps_tick()
                         cell_table["extra_info"] = EXTRA_INFO
                         cell_table["running_version"] = tostring(RUNNING_VERSION)
 
-                        local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, cell_table)
+                        local encapsulated_payload = encaps.encapsulate_data(IMEI, cell_table)
                         http_reporter.add_message(
                             nil,
                             encapsulated_payload,
@@ -252,7 +252,7 @@ local function gps_tick()
                         if config.get_config_value("REPORT_CELL_WITH_GPS") == "true" then
                             nmea_table["cell_info"] = at.get_cell_info()
                         end
-                        local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, nmea_table);
+                        local encapsulated_payload = encaps.encapsulate_data(IMEI, nmea_table);
                         http_reporter.add_message(
                             nil,
                             encapsulated_payload,
@@ -296,7 +296,8 @@ local function cell_tick()
                 local cell_table = device.get_device_info_table()
                 cell_table["extra_info"] = EXTRA_INFO
                 cell_table["running_version"] = tostring(RUNNING_VERSION)
-                local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, cell_table)
+                cell_table["device_info"] = ATI_STRING
+                local encapsulated_payload = encaps.encapsulate_data(IMEI, cell_table)
                 -- message, headers, host, port, path, encrypt
                 http_reporter.add_message(
                     nil,
@@ -368,7 +369,7 @@ local function handle_card_read_command(cmd_port, cmd_name, cmd_op, cmd_line, cm
     -- add_message(value)
     local data = {}
     data["card_read"] = value
-    local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, data, 0, 0)
+    local encapsulated_payload = encaps.encapsulate_data(IMEI, data)
     http_reporter.add_message(
         nil,
         encapsulated_payload,
@@ -462,7 +463,7 @@ local function engine_monitor_thread_f()
                 else
                     payload["engine"] = "stop"
                 end
-                local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, payload);
+                local encapsulated_payload = encaps.encapsulate_data(IMEI, payload);
                 http_reporter.add_message(
                     nil,
                     encapsulated_payload,
@@ -490,7 +491,7 @@ local function gpio_handler(pin, state, clock)
         end
     elseif pin == config.get_config_value("PIN_SOS") then
         payload["sos"] = state
-        local encapsulated_payload = encaps.encapsulate_data(ATI_STRING, payload);
+        local encapsulated_payload = encaps.encapsulate_data(IMEI, payload);
         http_reporter.add_message(
             nil,
             encapsulated_payload,

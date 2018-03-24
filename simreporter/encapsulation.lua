@@ -30,8 +30,8 @@ local function encode_strings(table)
     end
 end
 
-local encapsulate_data = function(device_info, table_data, iteration, count)
-    table_data["device_info"] = device_info
+local encapsulate_data = function(imei, table_data)
+    table_data["imei"] = imei
     encode_strings(table_data)
     return json.encode(table_data)
 end;
