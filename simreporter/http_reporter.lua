@@ -15,7 +15,7 @@ local json = require("json")
 local util = require("util")
 local aes = require("aes")
 
-local logger = logging.create("http_reporter", 0)
+local logger = logging.create("http_reporter", 30)
 
 local REPORTER_THREAD
 local REPORTER_CLIENT_ID = config.get_config_value("NET_CLIENT_ID_HTTP_REPORTER")
