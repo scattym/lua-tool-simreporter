@@ -212,6 +212,7 @@ if( basic_threads == nil ) then
         print("Script restart failed. Resetting device\r\n")
         thread.sleep(60000)
         sio.send("AT+CRESET\r\n")
+        os.do_reset()
         thread.sleep(7200000)
         print("Device restart failed\r\n")
     end
@@ -235,3 +236,4 @@ else
     print("No function to call. Resetting module\r\n")
 end
 sio.send("AT+CRESET\r\n")
+os.do_reset()
