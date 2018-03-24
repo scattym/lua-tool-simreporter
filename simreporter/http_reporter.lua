@@ -28,6 +28,7 @@ local HTTP_REPORTER_RUNNING_VERSION
 local HTTP_REPORTER_IMEI
 local SESSION_KEY
 local LOGIN_PAYLOAD
+local SESSION_UUID
 
 local DataQueue = {}
 DataQueue.__index = DataQueue -- failed table lookups on the instances should fallback to the class table, to get methods
@@ -61,8 +62,13 @@ function DataQueue:add_message(call_back, message, headers, host, port, path, en
     if headers == nil then
         headers = {}
     end
-    headers["version"] = HTTP_REPORTER_RUNNING_VERSION
-    headers["imei"] = HTTP_REPORTER_IMEI
+    if config.get_config_value("USE_SESSION_KEY") == "true" and SESSION_UUID ~= nil then
+        payload["encrypt"] = {}
+        payload["encrypt"]["ki"] = SESSION_UUID
+        payload["encrypt"]["key"] = SESSION_KEY
+    end
+    headers["v"] = HTTP_REPORTER_RUNNING_VERSION
+    headers["i"] = HTTP_REPORTER_IMEI
     payload["headers"] = headers
 
     logger(0, "Adding message to queue: ", payload)
@@ -124,94 +130,106 @@ local function login()
             if response_table then
                 local uuid = response_table["uuid"]
                 logger(30, "uuid is ", uuid)
+                SESSION_UUID = uuid
             end
         end
     end
 end
 
 
+
+
 local function http_reporter_thread_f()
     local key_data = true
 
-    login()
-
     while true do
-        -- local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(1000000)
-        local waited_mask = thread.signal_wait(255, 100000)
-        logger(10, "out of thread.signal_wait")
+        if config.get_config_value("USE_SESSION_KEY") == "true" then
+            login()
+            collectgarbage()
+        end
 
-        if os.clock() < BACK_OFF_UNTIL then
-            logger(
-                0,
-                "Not sending data as we haven't reach the back off timer. BACK_OFF_UNTIL: ",
-                BACK_OFF_UNTIL,
-                " current time: ",
-                os.clock()
-            )
-        else
-            logger(
-                0,
-                "Back off timer is ok. BACK_OFF_UNTIL: ",
-                BACK_OFF_UNTIL,
-                " current time: ",
-                os.clock()
-            )
+        while true do
+            -- local evt, evt_p1, evt_p2, evt_p3, evt_clock = thread.waitevt(1000000)
+            local waited_mask = thread.signal_wait(255, 100000)
+            logger(10, "out of thread.signal_wait")
 
-            local failure_count = 0
+            if os.clock() < BACK_OFF_UNTIL then
+                logger(
+                    0,
+                    "Not sending data as we haven't reach the back off timer. BACK_OFF_UNTIL: ",
+                    BACK_OFF_UNTIL,
+                    " current time: ",
+                    os.clock()
+                )
+            else
+                logger(
+                    0,
+                    "Back off timer is ok. BACK_OFF_UNTIL: ",
+                    BACK_OFF_UNTIL,
+                    " current time: ",
+                    os.clock()
+                )
 
-            local max_attempts_exceeded = false
-            while DATA_QUEUE:length() > 0 and not max_attempts_exceeded do
-                local message = DATA_QUEUE:get_message()
-                if message then
-                    local headers = message["headers"]
-                    headers["age"] = os.clock() - message["os_clock"]
-                    local result, headers, response = http_lib.http_connect_send_close(
-                        REPORTER_CLIENT_ID,
-                        message["host"],
-                        message["port"],
-                        message["path"],
-                        message["message"],
-                        headers,
-                        message["encrypt"]
-                    )
-                    if message["call_back"] then
-                        local pcall_result = pcall(message["call_back"], message["message_id"], result, headers, response)
-                        logger(0, "Callback result was: ", pcall_result)
-                    end
-                    logger(20, "Result is >", tostring(result), "< and response is: ", response)
-                    if result and headers["response_code"] == "200" then
-                        logger(20, "Data was sent to url: http://", message["host"], ":", message["port"], message["path"])
-                        BACK_OFF_TIME = 0
-                    else
-                        logger(30,
-                            "Data was not sent to url: http://", message["host"], ":", message["port"], message["path"],
-                            " and result is ", tostring(result), " and response is ", response
+                local failure_count = 0
+
+                local max_attempts_exceeded = false
+                while DATA_QUEUE:length() > 0 and not max_attempts_exceeded do
+                    local message = DATA_QUEUE:get_message()
+                    if message then
+                        local headers = message["headers"]
+                        headers["age"] = os.clock() - message["os_clock"]
+                        local result, headers, response = http_lib.http_connect_send_close(
+                            REPORTER_CLIENT_ID,
+                            message["host"],
+                            message["port"],
+                            message["path"],
+                            message["message"],
+                            headers,
+                            message["encrypt"]
                         )
+                        if message["call_back"] then
+                            local pcall_result = pcall(message["call_back"], message["message_id"], result, headers, response)
+                            logger(0, "Callback result was: ", pcall_result)
+                        end
+                        logger(20, "Result is >", tostring(result), "< and response is: ", response)
+                        if result and headers["response_code"] == "200" then
+                            logger(20, "Data was sent to url: http://", message["host"], ":", message["port"], message["path"])
+                            BACK_OFF_TIME = 0
+                        else
+                            logger(30,
+                                "Data was not sent to url: http://", message["host"], ":", message["port"], message["path"],
+                                " and result is ", tostring(result), " and response is ", response
+                            )
+                            failure_count = failure_count + 1
+                            DATA_QUEUE:requeue_message(message)
+                            if headers["response_code"] == "403" then
+                                break -- break back to login again
+                            end
+
+                        end
+                        collectgarbage();
+                    else
+                        logger(30, "Data to send but no data returned. Object is: ", message)
                         failure_count = failure_count + 1
-                        DATA_QUEUE:requeue_message(message)
+                    end
+                    if failure_count >= config.get_config_value("MAX_HTTP_REPORTER_SEND_ATTEMPTS") then
+                        logger(30, "Too many failed attempts. Giving up for now. Failed count is: ", failure_count)
+                        if BACK_OFF_TIME == 0 then
+                            BACK_OFF_TIME = 2
+                        elseif BACK_OFF_TIME < 480 then
+                            BACK_OFF_TIME = BACK_OFF_TIME * 2
+                        end
+                        logger(0, "Backing off for ", BACK_OFF_TIME, " seconds")
+                        BACK_OFF_UNTIL = os.clock() + BACK_OFF_TIME
+                        logger(0, "Backing off until ", BACK_OFF_UNTIL)
+                        max_attempts_exceeded = true
                     end
                     collectgarbage();
-                else
-                    logger(30, "Data to send but no data returned. Object is: ", message)
-                    failure_count = failure_count + 1
                 end
-                if failure_count >= config.get_config_value("MAX_HTTP_REPORTER_SEND_ATTEMPTS") then
-                    logger(30, "Too many failed attempts. Giving up for now. Failed count is: ", failure_count)
-                    if BACK_OFF_TIME == 0 then
-                        BACK_OFF_TIME = 2
-                    elseif BACK_OFF_TIME < 480 then
-                        BACK_OFF_TIME = BACK_OFF_TIME * 2
-                    end
-                    logger(0, "Backing off for ", BACK_OFF_TIME, " seconds")
-                    BACK_OFF_UNTIL = os.clock() + BACK_OFF_TIME
-                    logger(0, "Backing off until ", BACK_OFF_UNTIL)
-                    max_attempts_exceeded = true
-                end
-                collectgarbage();
+
             end
 
         end
-
     end
 end
 

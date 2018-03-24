@@ -171,7 +171,12 @@ local tohex = function(data)
 	    local hexBytes = ""
 
         for i,byte in ipairs(data) do
-            hexBytes = hexBytes .. string.format("%02X", byte)
+            if type(byte) == "string" then
+                hexBytes = hexBytes .. string.format("%02X", string.byte(byte))
+            else
+                hexBytes = hexBytes .. string.format("%02X", byte)
+            end
+
         end
 
         return hexBytes

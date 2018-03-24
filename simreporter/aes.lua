@@ -892,7 +892,13 @@ local random = math.random
 function public.encryptString(key, data, modeFunction, iv)
 	if iv then
 		local ivCopy = {}
-		for i = 1, 16 do ivCopy[i] = iv[i] end
+		for i = 1, 16 do
+			if type(iv[i]) == "string" then
+				ivCopy[i] = string.byte(iv[i])
+			else
+				ivCopy[i] = iv[i]
+			end
+		end
 		iv = ivCopy
 	else
 		iv = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
@@ -965,7 +971,13 @@ end
 function public.decryptString(key, data, modeFunction, iv)
 	if iv then
 		local ivCopy = {}
-		for i = 1, 16 do ivCopy[i] = iv[i] end
+		for i = 1, 16 do
+			if type(iv[i]) == "string" then
+				ivCopy[i] = string.byte(iv[i])
+			else
+				ivCopy[i] = iv[i]
+			end
+		end
 		iv = ivCopy
 	else
 		iv = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
@@ -1108,8 +1120,11 @@ local function encrypt_raw_key(key, data, keyLength, mode, iv)
 
     if type(key) == "string" then
         key = { string.byte(key, 1,-1) }
-    end
-    print("Type of key is now ", type(key))
+	end
+	if type(iv) == "string" then
+		iv = { string.byte(iv, 1,-1) }
+	end
+    logger(0, "Type of key is now ", type(key))
 
 	local paddedData = util.padByteString(data)
     --logger(0, "padded data length ", #paddedData)
@@ -1166,7 +1181,10 @@ local function decrypt_raw_key(key, data, keyLength, mode, iv)
 
     if type(key) == "string" then
         key = { string.byte(key, 1,-1) }
-    end
+	end
+	if type(iv) == "string" then
+		iv = { string.byte(iv, 1,-1) }
+	end
     -- print("Type of key is now ", type(key))
     --logger(0, "Key: ", util.tohex(key))
 	local plain

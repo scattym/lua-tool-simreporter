@@ -120,14 +120,15 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
     if encrypt and type(encrypt) == "boolean" and encrypt == true then
         headers["encrypted"] = "true"
     end
+
+    local iv = aes.getRandomData(16)
     if encrypt and type(encrypt) == "table" and encrypt["ki"] ~= nil and encrypt["key"] ~= nil then
         -- headers["iv"] = rsa.num_to_hex(encrypt["iv"])
         -- headers["sk"] = rsa.num_to_hex(encrypt["enc_key"])
-        local seed = aes.getRandomData(16)
+        headers["iv"] = util.tohex(iv)
         headers["encrypted"] = "true"
-        headers["ki"] = aes.bytesToHex(seed)
-        local key = aes.seed_to_key(seed)
-        headers["key"] = aes.bytesToHex(key)
+        headers["ki"] = encrypt["ki"]
+        headers["key"] = util.tohex(encrypt["key"])
         headers["ver"] = HTL_VERSION
         headers["i"] = HTL_IMEI
     end
@@ -137,7 +138,12 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
 
         logger(0, "About to encrypt payload: ", data);
         collectgarbage()
-        payload = aes.encrypt("password", data, aes.AES128, aes.CBCMODE)
+
+        if encrypt["key"] then
+            payload = aes.encrypt_raw_key(encrypt["key"], data, aes.AES128, aes.CBCMODE, iv)
+        else
+            payload = aes.encrypt("password", data, aes.AES128, aes.CBCMODE)
+        end
         logger(0, "Encrypted payload is ", util.tohex(payload))
         logger(10, "Encrypted payload length is ", #payload)
         collectgarbage()
