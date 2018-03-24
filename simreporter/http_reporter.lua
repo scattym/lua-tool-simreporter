@@ -110,34 +110,35 @@ end
 local DATA_QUEUE = DataQueue(200)
 
 local function login()
-    logger(30, "Payload as hex is ", LOGIN_PAYLOAD)
-    local as_str = util.fromhex(LOGIN_PAYLOAD)
-    local result, headers, response = http_lib.http_connect_send_close(
-        REPORTER_CLIENT_ID,
-        config.get_config_value("UPDATE_HOST"),
-        config.get_config_value("UPDATE_PORT"),
-        "/v3/login",
-        as_str,
-        {}
-    )
-    if( not result or not string.equal(headers["response_code"], "200") ) then
-        logger(30, "Login failed. Result was: ", result, " and response code: ", headers["response_code"])
+    if not LOGIN_PAYLOAD then
+        logger(30, "No login payload. Login not possible.")
     else
-        logger(30, "Login sucessful. Result was: ", result, " and response code: ", headers["response_code"])
-        local decrypted = aes.decrypt_raw_key(SESSION_KEY, response, aes.AES128, aes.CBCMODE)
-        if decrypted then
-            local response_table = json.decode(decrypted)
-            if response_table then
-                local uuid = response_table["uuid"]
-                logger(30, "uuid is ", uuid)
-                SESSION_UUID = uuid
+        logger(30, "Payload as hex is ", LOGIN_PAYLOAD)
+        local as_str = util.fromhex(LOGIN_PAYLOAD)
+        local result, headers, response = http_lib.http_connect_send_close(
+            REPORTER_CLIENT_ID,
+            config.get_config_value("UPDATE_HOST"),
+            config.get_config_value("UPDATE_PORT"),
+            "/v3/login",
+            as_str,
+            {}
+        )
+        if( not result or not string.equal(headers["response_code"], "200") ) then
+            logger(30, "Login failed. Result was: ", result, " and response code: ", headers["response_code"])
+        else
+            logger(30, "Login sucessful. Result was: ", result, " and response code: ", headers["response_code"])
+            local decrypted = aes.decrypt_raw_key(SESSION_KEY, response, aes.AES128, aes.CBCMODE)
+            if decrypted then
+                local response_table = json.decode(decrypted)
+                if response_table then
+                    local uuid = response_table["uuid"]
+                    logger(30, "uuid is ", uuid)
+                    SESSION_UUID = uuid
+                end
             end
         end
     end
 end
-
-
-
 
 local function http_reporter_thread_f()
     local key_data = true

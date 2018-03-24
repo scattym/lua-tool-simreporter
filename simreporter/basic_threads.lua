@@ -470,17 +470,6 @@ local start_threads = function (version)
         vmsleep(30000)
     end
 
-    logger(30, "##########################################################################################")
-    local x = sha256.sum("test")
-    logger(30, type(x))
-    logger(30, x)
-
-    logger(30, decrypted)
-    logger(30, "Starting key gen")
-    local session_key, enc_login_message = keygen.create_and_encrypt_key(imei, 16)
-    logger(30, "Done encrypting key")
-
-
     http_lib.set_device_params(imei, running_version)
 
     device_setup()
@@ -501,6 +490,14 @@ local start_threads = function (version)
 
     if config.get_config_value("CHECK_FOR_FIRMWARE_ON_BOOT") == "true" then
         firmware.check_firmware_and_maybe_update(imei, running_version)
+    end
+
+    local session_key
+    local enc_login_message
+    if config.get_config_value("USE_SESSION_KEY") == "true" then
+        logger(0, "Starting key gen")
+        session_key, enc_login_message = keygen.create_and_encrypt_key(imei, 16)
+        logger(0, "Done encrypting key")
     end
 
     local http_reporter_thread, running = http_reporter.start_thread(imei, running_version, session_key, enc_login_message)
