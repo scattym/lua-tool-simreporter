@@ -31,25 +31,25 @@ local create_and_encrypt_key = function(imei, bytes)
     -- logger(30, "Raw key is", aes.toHexString(raw_key))
     local key_encoded = base64.encode(raw_key)
     local random_encoded = base64.encode(aes.getRandomString(bytes))
-    logger(30, "Key generation complete.")
+    logger(20, "Key generation complete.")
 
     local login_message = {}
     login_message["r"] = tostring(random_encoded)
     login_message["i"] = tostring(imei)
     login_message["sk"] = tostring(key_encoded)
     local json_message = json.encode(login_message)
-    logger(30, "json message raw ", json_message)
+    logger(20, "json message raw ", json_message)
 
     local message = rsa.bytes_to_num(json_message) -- message is the key
-    logger(30, "json message hex is " .. rsa.num_to_hex(message))
-    logger(30, "Calculated message as big int: " .. tostring(message))
+    logger(10, "json message hex is " .. rsa.num_to_hex(message))
+    logger(0, "Calculated message as big int: " .. tostring(message))
     local exponent = rsa.hex_to_num("10001")
-    logger(30, "Calculated exponent")
+    logger(20, "Calculated exponent")
     local n_modulus = rsa.hex_to_num(modulus)
-    logger(30, "Calculated modulus")
+    logger(20, "Calculated modulus")
 
     local enc_login_message = rsa.mod_power(message, exponent, n_modulus)
-    logger(30, "Encrypted key: ", rsa.num_to_hex(enc_login_message))
+    logger(10, "Encrypted key: ", rsa.num_to_hex(enc_login_message))
 
     local raw_key_bytes = { string.byte(raw_key, 1,-1) }
     return raw_key_bytes, rsa.num_to_hex(enc_login_message)

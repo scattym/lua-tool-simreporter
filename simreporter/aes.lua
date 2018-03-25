@@ -1067,7 +1067,7 @@ _M.CTRMODE = 5
 local function pwToKey(password, keyLength, iv)
     --return password
     if sha256 then
-        logger(30, "calculating")
+        logger(20, "calculating")
         local hash = sha256.init()
         hash:update(password)
         local checksum = hash:final()

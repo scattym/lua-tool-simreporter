@@ -10,7 +10,7 @@
 
 local _M = {}
 local logging = require("logging")
-local logger = logging.create("BigInt", 30)
+local logger = logging.create("rsa_lib", 30)
 
 ---------------------------------------
 --- Lua 5.0/5.1/WoW Header ------------
@@ -324,7 +324,7 @@ local function BigInt_ModPower2(b,e,m)					--calculate b^e mod m
 	end
 	repeat
         collectgarbage()
-        logger(30, "Iteration of modpower")
+        -- logger(30, "Iteration of modpower")
 
 
         local div2_x = t
@@ -729,7 +729,7 @@ local function BigInt_ModPower2(b,e,m)					--calculate b^e mod m
 
         --logger(30, "End iteration2")
 	until (#t==1 and t[1]==0)
-    logger(30, "Returning s")
+    logger(20, "Returning s")
 	return s
 end
 
