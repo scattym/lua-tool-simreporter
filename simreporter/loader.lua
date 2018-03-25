@@ -227,7 +227,8 @@ print("main_id=", main_id, "\r\n");
 
 collectgarbage();
 print("Starting threads\r\n")
-if basic_threads.start_threads then
+
+if basic_threads and basic_threads.start_threads then
     local status, result = pcall(basic_threads.start_threads, running_version)
 
     print("exit main thread\r\n")
@@ -238,4 +239,11 @@ else
     print("No function to call. Resetting module\r\n")
 end
 sio.send("AT+CRESET\r\n")
-os.do_reset()
+local reset_result = os.do_reset()
+print("Do reset sent with result ", reset_result, "\r\n")
+thread.sleep(60000)
+print("Still running. Trying hardware reset\r\n")
+reset_result = os.do_reset(true)
+print("Do reset sent with result ", reset_result, "\r\n")
+thread.sleep(1000)
+print("Still running. No more options\r\n")

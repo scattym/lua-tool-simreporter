@@ -3,7 +3,8 @@ local _M = {}
 local json = require("json")
 local logger = require("logging")
 local tcp = require("tcp_client")
-local http_lib = require("http_lib")
+local http_reporter = require("http_reporter")
+
 
 local CONFIG ={}
 -- Time to sleep between successive nmea reports
@@ -264,7 +265,7 @@ _M.check_hmac_config = check_hmac_config
 
 local set_config_from_json = function(json_str)
     logger.log("config", 0, "Setting config from json")
-    config_table = json.decode(json_str)
+    local config_table = json.decode(json_str)
     if not config_table then
         logger.log("config", 30, "Unable to load json from string")
         return false
@@ -316,9 +317,10 @@ end
 _M.load_config_from_file = load_config_from_file
 
 local load_config_from_server = function(imei, version)
+
     local fn_result = false
 
-    local result, headers, response = http_lib.synchronous_http_get(get_config_value("NET_CLIENT_ID_HTTP_SYNC"), get_config_value("UPDATE_HOST"), get_config_value("UPDATE_PORT"), "/get_config?ident=imei:" .. imei .. "&version=" .. version .. "&type=5300", {})
+    local result, headers, response = http_reporter.synchronous_http_get(get_config_value("UPDATE_HOST"), get_config_value("UPDATE_PORT"), "/v3/get_config?ident=imei:" .. imei .. "&version=" .. version .. "&type=5300", {})
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("config", 30, "Callout for config failed. Result was: ", result, " and response code: ", headers["response_code"])
     else

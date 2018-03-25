@@ -8,7 +8,7 @@
 
 local _M = {}
 
-local http_lib = require("http_lib")
+local http_reporter = require("http_reporter")
 local unzip = require("unzip")
 local at = require("at_commands")
 local json = require("json")
@@ -24,12 +24,39 @@ end
 
 logger.create_logger("firmware", 30)
 
+local function check_version(result, headers, response, running_version)
+    if( not result or not string.equal(headers["response_code"], "200") ) then
+        logger.log("firmware", 30, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
+    else
+        logger.log("firmware", 10, "Response is ", response)
+
+        local version = tonumber(response)
+        if( not version and response ~= "unknown") then
+            logger.log("firmware", 30, "Invalid response. Expecting version number. Got: ", response)
+        end
+
+        if( result and version and version > 0 ) then
+            if( string.equal(running_version, response) ) then
+                logger.log("firmware", 10, "The running version and new versions are the same: ", running_version)
+            else
+                logger.log("firmware", 10, "Need to update. Running version is: ", tostring(running_version), " and new version is: ", response)
+                if( is_version_quarantined(response) ) then
+                    logger.log("firmware", 30, "Version ", response, " is already quarantined, not downloading")
+                else
+                    return response
+                end
+            end
+        end
+    end
+    return nil
+end
+
 local function get_firmware(imei, version)
     local fn_result = false
 
     collectgarbage()
 
-    local result, headers, response = http_lib.http_connect_send_close(NET_CLIENT_ID_FIRMWARE, config.get_config_value("FIRMWARE_HOST"), config.get_config_value("UPDATE_PORT"), "/get_firmware?ident=imei:" .. imei, "");
+    local result, headers, response = http_reporter.synchronous_http_get(config.get_config_value("FIRMWARE_HOST"), config.get_config_value("UPDATE_PORT"), "/v3/get_firmware?ident=imei:" .. imei, {});
     collectgarbage()
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 30, "Callout for firmware failed. Result was: ", result, " and response code: ", headers["response_code"])
@@ -81,43 +108,24 @@ end
 
 local check_firmware_and_maybe_update = function(imei, current_version)
 
-    local result, headers, response = http_lib.http_connect_send_close(NET_CLIENT_ID_FIRMWARE, config.get_config_value("FIRMWARE_HOST"), 65535, "/get_firmware_version?ident=imei:" .. imei, "");
+    local result, headers, response = http_reporter.synchronous_http_get(config.get_config_value("FIRMWARE_HOST"), 65535, "/v3/get_firmware_version?ident=imei:" .. imei, {});
 
-    if( not result or not string.equal(headers["response_code"], "200") ) then
-        logger.log("firmware", 30, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
-    else
-        logger.log("firmware", 10, "Response is ", response)
-
-        local version = tonumber(response)
-        if( not version and response ~= "unknown") then
-            logger.log("firmware", 30, "Invalid response. Expecting version number. Got: ", response)
-        end
-
-        if( result and version and version > 0 ) then
-            if( string.equal(current_version, response) ) then
-                logger.log("firmware", 10, "The running version and new versions are the same: ", current_version)
-            else
-                logger.log("firmware", 10, "Need to update. Running version is: ", tostring(current_version), " and new version is: ", response)
-                if( is_version_quarantined(response) ) then
-                    logger.log("firmware", 30, "Version ", response, " is already quarantined, not downloading")
-                else
-                    logger.log("firmware", 10, "Calling get_firmware")
-                    local get_firmware_result = get_firmware(imei, response)
-                    collectgarbage()
-                    if( not get_firmware_result ) then
-                        logger.log("firmware", 30, "Firmware retrieval failed. Not restarting.")
-                    else
-                        logger.log("firmware", 10, "New firmware retrieval was successful. Restarting script.")
-                        thread.sleep(5000)
-                        os.restartscript()
-                        thread.sleep(60000)
-                        logger.log("firmware", 30, "Script restart failed. Restarting device")
-                        at.reset()
-                        thread.sleep(3600000)
-                        logger.log("firmware", 30, "ERROR: Device restart failed.")
-                    end
-                end
-            end
+    local version = check_version(result, headers, response, current_version)
+    if version then
+        logger.log("firmware", 10, "Calling get_firmware")
+        local get_firmware_result = get_firmware(imei, version)
+        collectgarbage()
+        if( not get_firmware_result ) then
+            logger.log("firmware", 30, "Firmware retrieval failed. Not restarting.")
+        else
+            logger.log("firmware", 10, "New firmware retrieval was successful. Restarting script.")
+            thread.sleep(5000)
+            os.restartscript()
+            thread.sleep(60000)
+            logger.log("firmware", 30, "Script restart failed. Restarting device")
+            at.reset()
+            thread.sleep(3600000)
+            logger.log("firmware", 30, "ERROR: Device restart failed.")
         end
     end
     collectgarbage();
@@ -127,37 +135,18 @@ _M.check_firmware_and_maybe_update = check_firmware_and_maybe_update
 
 local check_firmware_and_maybe_reset = function(imei, current_version)
 
-    local result, headers, response = http_lib.http_connect_send_close(NET_CLIENT_ID_FIRMWARE, config.get_config_value("FIRMWARE_HOST"), 65535, "/get_firmware_version?ident=imei:" .. imei, "");
+    local result, headers, response = http_reporter.synchronous_http_get(config.get_config_value("FIRMWARE_HOST"), 65535, "/v3/get_firmware_version?ident=imei:" .. imei, {});
 
-    if( not result or not string.equal(headers["response_code"], "200") ) then
-        logger.log("firmware", 30, "Callout for version failed. Result was: ", result, " and response code: ", headers["response_code"])
-    else
-        logger.log("firmware", 10, "Response is ", response)
-
-        local version = tonumber(response)
-        if( not version and response ~= "unknown") then
-            logger.log("firmware", 30, "Invalid response. Expecting version number. Got: ", response)
-        end
-
-        if( result and version and version > 0 ) then
-            if( string.equal(current_version, response) ) then
-                logger.log("firmware", 10, "The running version and new versions are the same: ", current_version)
-            else
-                logger.log("firmware", 10, "Need to update. Running version is: ", tostring(current_version), " and new version is: ", response)
-                if( is_version_quarantined(response) ) then
-                    logger.log("firmware", 30, "Version ", response, " is already quarantined, not downloading")
-                else
-                    logger.log("firmware", 30, "New firmware ready to go. Restarting script to download.")
-                    thread.sleep(5000)
-                    os.restartscript()
-                    thread.sleep(60000)
-                    logger.log("firmware", 30, "Script restart failed. Restarting device")
-                    at.reset()
-                    thread.sleep(3600000)
-                    logger.log("firmware", 30, "ERROR: Device restart failed.")
-                end
-            end
-        end
+    local version = check_version(result, headers, response, current_version)
+    if version then
+        logger.log("firmware", 30, "New firmware ready to go. Restarting script to download.")
+        thread.sleep(5000)
+        os.restartscript()
+        thread.sleep(60000)
+        logger.log("firmware", 30, "Script restart failed. Restarting device")
+        at.reset()
+        thread.sleep(3600000)
+        logger.log("firmware", 30, "ERROR: Device restart failed.")
     end
     collectgarbage();
 end

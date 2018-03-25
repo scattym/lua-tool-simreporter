@@ -9,17 +9,17 @@
 
 local logging = require("logging")
 local list = require("list")
-local http_lib = require("http_lib")
-local config = require("config")
 local json = require("json")
 local util = require("util")
 local aes = require("aes")
+local http_lib = require("http_lib")
+local CONFIG
 
 local logger = logging.create("http_reporter", 30)
 
 local REPORTER_THREAD
-local REPORTER_CLIENT_ID = config.get_config_value("NET_CLIENT_ID_HTTP_REPORTER")
-local REPORTER_CRITICAL_SECTION = config.get_config_value("CRITICAL_SECTION_HTTP_REPORTER")
+local REPORTER_CLIENT_ID
+local REPORTER_CRITICAL_SECTION
 local MESSAGE_ID_COUNTER = 0
 local BACK_OFF_TIME = 0
 local BACK_OFF_UNTIL = 0
@@ -30,6 +30,17 @@ local SESSION_KEY
 local LOGIN_PAYLOAD
 local SESSION_UUID
 local LOGGED_IN = false
+
+
+local function set_config(config)
+    if not REPORTER_CLIENT_ID then
+        REPORTER_CLIENT_ID = config.get_config_value("NET_CLIENT_ID_HTTP_REPORTER")
+    end
+    if not REPORTER_CRITICAL_SECTION then
+        REPORTER_CRITICAL_SECTION = config.get_config_value("CRITICAL_SECTION_HTTP_REPORTER")
+    end
+    CONFIG = config
+end
 
 local DataQueue = {}
 DataQueue.__index = DataQueue -- failed table lookups on the instances should fallback to the class table, to get methods
@@ -47,8 +58,7 @@ function DataQueue:_init(max_length)
     return self
 end
 
--- format of call_back is function(data["message_id"], result, headers, response)
-function DataQueue:add_message(call_back, message, headers, host, port, path, encrypt)
+local function message_to_payload(call_back, message, headers, host, port, path, encrypt)
     local payload = {}
     MESSAGE_ID_COUNTER = MESSAGE_ID_COUNTER + 1
     payload["message_id"] = MESSAGE_ID_COUNTER
@@ -63,7 +73,7 @@ function DataQueue:add_message(call_back, message, headers, host, port, path, en
     if headers == nil then
         headers = {}
     end
-    if config.get_config_value("USE_SESSION_KEY") == "true" and SESSION_UUID ~= nil then
+    if CONFIG.get_config_value("USE_SESSION_KEY") == "true" and SESSION_UUID ~= nil then
         payload["encrypt"] = {}
         payload["encrypt"]["ki"] = SESSION_UUID
         payload["encrypt"]["key"] = SESSION_KEY
@@ -71,6 +81,12 @@ function DataQueue:add_message(call_back, message, headers, host, port, path, en
     headers["v"] = HTTP_REPORTER_RUNNING_VERSION
     headers["i"] = HTTP_REPORTER_IMEI
     payload["headers"] = headers
+    return payload
+
+end
+-- format of call_back is function(data["message_id"], result, headers, response)
+function DataQueue:add_message(call_back, message, headers, host, port, path, encrypt)
+    local payload = message_to_payload(call_back, message, headers, host, port, path, encrypt)
 
     logger(0, "Adding message to queue: ", payload)
     thread.enter_cs(REPORTER_CRITICAL_SECTION)
@@ -87,7 +103,7 @@ end
 function DataQueue:requeue_message(payload)
     logger(0, "Putting message back on queue. Payload: ", payload)
     payload["failure_count"] = payload["failure_count"] + 1
-    if payload["failure_count"] < config.get_config_value("MAX_HTTP_REPORTER_PAYLOAD_ATTEMPTS") then
+    if payload["failure_count"] < CONFIG.get_config_value("MAX_HTTP_REPORTER_PAYLOAD_ATTEMPTS") then
 
         thread.enter_cs(REPORTER_CRITICAL_SECTION)
         self.data_list:push_right(payload)
@@ -129,8 +145,8 @@ local function login(imei, running_version, session_key, enc_login_message)
             local as_str = util.fromhex(LOGIN_PAYLOAD)
             local result, headers, response = http_lib.http_connect_send_close(
                 REPORTER_CLIENT_ID,
-                config.get_config_value("UPDATE_HOST"),
-                config.get_config_value("UPDATE_PORT"),
+                CONFIG.get_config_value("UPDATE_HOST"),
+                CONFIG.get_config_value("UPDATE_PORT"),
                 "/v3/login",
                 as_str,
                 {}
@@ -162,7 +178,7 @@ local function http_reporter_thread_f()
     local key_data = true
 
     while true do
-        if config.get_config_value("USE_SESSION_KEY") == "true" then
+        if CONFIG.get_config_value("USE_SESSION_KEY") == "true" then
             login()
             collectgarbage()
         end
@@ -234,7 +250,7 @@ local function http_reporter_thread_f()
                         failure_count = failure_count + 1
                     end
                     logger(0, "About to check failure count")
-                    if failure_count >= config.get_config_value("MAX_HTTP_REPORTER_SEND_ATTEMPTS") then
+                    if failure_count >= CONFIG.get_config_value("MAX_HTTP_REPORTER_SEND_ATTEMPTS") then
                         logger(30, "Too many failed attempts. Giving up for now. Failed count is: ", failure_count)
                         if BACK_OFF_TIME == 0 then
                             BACK_OFF_TIME = 2
@@ -279,11 +295,29 @@ local function add_message(call_back, message, headers, host, port, path, encryp
     return DATA_QUEUE:add_message(call_back, message, headers, host, port, path, encrypt)
 end
 
+
+-- Not thread safe, so don't call once main threads have started
+local function synchronous_http_get(host, port, path, headers)
+    local payload = message_to_payload(nil, nil, headers, host, port, path, true)
+    logger(0, "Calling out for a synchronous http get")
+    return http_lib.http_connect_send_close(
+        CONFIG.get_config_value("NET_CLIENT_ID_HTTP_SYNC"),
+        payload["host"],
+        payload["port"],
+        payload["path"],
+        payload["message"],
+        payload["headers"],
+        payload["encrypt"]
+    )
+    --return false, "", ""
+end
+
 local api = {
     add_message = add_message,
     start_thread = start_thread,
     login = login,
-    --synchronous_http_get = synchronous_http_get,
+    synchronous_http_get = synchronous_http_get,
+    set_config = set_config,
 }
 
 return api

@@ -1256,8 +1256,8 @@ _M.getRandomData = getRandomData
 
 local function getRandomString(bytes)
     local data = getRandomData(bytes)
-    logger(30, "data is ", data)
-    logger(30, "concat is ", table.concat(data))
+    logger(20, "data is ", data)
+    logger(10, "concat is ", table.concat(data))
 	return table.concat(data)
 end
 _M.getRandomString = getRandomString

@@ -135,10 +135,10 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
         logger(0, "Encrypt is ", encrypt)
 
         if type(encrypt) == "table" and encrypt["key"] then
-            logger(0, "Encrypting with key. IV", util.tohex(iv), " key ", util.tohex(encrypt["key"]))
+            logger(10, "Encrypting with key. IV ", util.tohex(iv), " key ", util.tohex(encrypt["key"]))
             payload = aes.encrypt_raw_key(encrypt["key"], data, aes.AES128, aes.CBCMODE, iv)
         else
-            logger(0, "Encrypting with default")
+            logger(10, "Encrypting with default")
             payload = aes.encrypt("password", data, aes.AES128, aes.CBCMODE)
         end
         logger(0, "Encrypted payload is ", util.tohex(payload))
@@ -167,11 +167,35 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
         if( result and response ) then
             local headers, response_payload = parse_http_response(response)
             collectgarbage()
-            if headers["encrypted"] == "true" then
+            --[[if headers["encrypted"] == "true" then
                 logger(10, "Encrypted hex payload is ", aes.toHexString(response_payload))
                 local decrypted = aes.decrypt("password", response_payload, aes.AES128, aes.CBCMODE)
                 logger(10, "decrypted payload is ", decrypted)
                 response_payload = decrypted
+                collectgarbage()
+            end]]--
+            if type(encrypt) == "table" and encrypt["key"] then
+                logger(10, "Decrypting with session key")
+                logger(0, "Encrypted hex payload is ", aes.toHexString(response_payload))
+                local decrypt_ok, decrypted = pcall(aes.decrypt_raw_key, encrypt["key"], response_payload, aes.AES128, aes.CBCMODE, iv)
+                if decrypt_ok then
+                    logger(10, "decrypted payload is ", decrypted)
+                    response_payload = decrypted
+                else
+                    logger(30, "Decryption failed with error: ", decrypt_ok)
+                end
+                collectgarbage()
+            elseif type(encrypt) == "boolean" and encrypt == true then
+                logger(10, "Decrypting with default key")
+                logger(0, "Encrypted hex payload is ", aes.toHexString(response_payload))
+                -- local decrypted = aes.decrypt("password", response_payload, aes.AES128, aes.CBCMODE)
+                local decrypt_ok, decrypted = pcall(aes.decrypt, "password", response_payload, aes.AES128, aes.CBCMODE)
+                if decrypt_ok then
+                    logger(10, "decrypted payload is ", decrypted)
+                    response_payload = decrypted
+                else
+                    logger(30, "Decryption failed with error: ", decrypt_ok)
+                end
                 collectgarbage()
             end
             return result, headers, response_payload
@@ -181,17 +205,9 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
     return false, "", ""
 end
 
--- Not thread safe, so don't call once main threads have started
-local function synchronous_http_get(client_id, host, port, path, headers)
-    logger(0, "Calling out for a synchronous http get")
-    return http_connect_send_close(client_id, host, port, path, "", {}, false)
-    --return false, "", ""
-end
-
 
 
 local api = {
-    synchronous_http_get = synchronous_http_get,
     http_connect_send_close = http_connect_send_close,
     set_device_params = set_device_params,
 }
