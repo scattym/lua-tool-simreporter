@@ -32,7 +32,7 @@ local make_http_headers = function(host, path, length, headers)
     http_req = http_req .. "HTTP/1.1\r\nHost: ";
     http_req = http_req .. tostring(host);
     http_req = http_req .. "\r\n";
-    http_req = http_req .. "User-Agent: SC/1.0\r\n" -- (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
+    -- http_req = http_req .. "User-Agent: SC/1.0\r\n" -- (Windows NT 5.1; rv:2.0) Gecko/20100101 Firefox/4.0\r\n";
     http_req = http_req .. "Authorization: bc733796ca38178dbee79f68ba4271e97fe170d4\r\n";
     for key, value in pairs(headers) do
         http_req = http_req .. key .. ": " .. value .. "\r\n"
