@@ -228,7 +228,7 @@ local function gps_tick()
 
                     if config.get_config_value("REPORT_DEVICE_INFO_WITH_GPS") == "true" then
                         local cell_table = device.get_device_info_table();
-                        cell_table["extra_info"] = EXTRA_INFO
+                        -- cell_table["extra_info"] = EXTRA_INFO
                         cell_table["running_version"] = tostring(RUNNING_VERSION)
 
                         local encapsulated_payload = encaps.encapsulate_data(IMEI, cell_table)
@@ -294,7 +294,7 @@ local function cell_tick()
         if last_cell_report_has_expired() then
             for i=1,1 do
                 local cell_table = device.get_device_info_table()
-                cell_table["extra_info"] = EXTRA_INFO
+                -- cell_table["extra_info"] = EXTRA_INFO
                 cell_table["running_version"] = tostring(RUNNING_VERSION)
                 cell_table["device_info"] = ATI_STRING
                 local encapsulated_payload = encaps.encapsulate_data(IMEI, cell_table)
