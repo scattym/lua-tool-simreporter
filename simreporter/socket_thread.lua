@@ -91,10 +91,20 @@ local process_payload = function(client_id, data)
     local return_string = ""
     if json_object then
         if json_object["command"] then
-            return_string = return_string .. at.run_command(json_object["command"])
+            local run_cmd_response = at.run_command(json_object["command"])
+            if run_cmd_response == nil then
+                logger(30, "Run command response was nil for data: ", data)
+            else
+                return_string = return_string .. run_cmd_response
+            end
         end
         if json_object["cli"] then
-            return_string = return_string .. parse_cli(json_object["cli"])
+            local cli_response = parse_cli(json_object["cli"])
+            if cli_response == nil then
+                logger(30, "CLI response was nil for data: ", data)
+            else
+                return_string = return_string .. cli_response
+            end
         end
         if return_string ~= "" then
             send_data(client_id, return_string, 1, true)

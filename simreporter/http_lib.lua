@@ -10,7 +10,7 @@ local tcp = require("tcp_client")
 local aes = require("aes")
 local util = require("util")
 
-local logger = logging.create("http_lib", 30)
+local logger = logging.create("http_lib", 10)
 
 local HTL_IMEI
 local HTL_VERSION
@@ -148,7 +148,7 @@ local http_connect_send_close = function(client_id, host, port, path, data, head
     else
 
         payload = data
-        logger(0, "Not encrypting ", tostring(payload))
+        logger(10, "Not encrypting ", tostring(payload))
 
     end
     local payload_length = 0
