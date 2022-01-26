@@ -51,12 +51,12 @@ local function check_version(result, headers, response, running_version)
     return nil
 end
 
-local function get_firmware(imei, version)
+local function get_firmware_binary(imei, version)
     local fn_result = false
 
     collectgarbage()
 
-    local result, headers, response = http_reporter.synchronous_http_get(config.get_config_value("FIRMWARE_HOST"), config.get_config_value("UPDATE_PORT"), "/v3/get_firmware?ident=imei:" .. imei, {});
+    local result, headers, response = http_reporter.synchronous_http_get(config.get_config_value("FIRMWARE_HOST"), config.get_config_value("UPDATE_PORT"), "/v3/get_firmware_binary?ident=imei:" .. imei, {});
     collectgarbage()
     if( not result or not string.equal(headers["response_code"], "200") ) then
         logger.log("firmware", 30, "Callout for firmware failed. Result was: ", result, " and response code: ", headers["response_code"])
@@ -112,8 +112,8 @@ local check_firmware_and_maybe_update = function(imei, current_version)
 
     local version = check_version(result, headers, response, current_version)
     if version then
-        logger.log("firmware", 10, "Calling get_firmware")
-        local get_firmware_result = get_firmware(imei, version)
+        logger.log("firmware", 10, "Calling get_firmware_binary")
+        local get_firmware_result = get_firmware_binary(imei, version)
         collectgarbage()
         if( not get_firmware_result ) then
             logger.log("firmware", 30, "Firmware retrieval failed. Not restarting.")
