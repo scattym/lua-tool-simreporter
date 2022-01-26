@@ -4,18 +4,13 @@ This README would normally document whatever steps are necessary to get your app
 
 ### What is this repository for? ###
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+* This project is a set of code to take the simcom 5320/5360 devices with embedded LUA run time to add GPS tracking functionality.
+* This makes for an extremely low cost 4G GPS tracking device which can easily have all the same functionality as the commercial solutions due to the feature set of the simcom 53X0 devices.
 
 ### How do I get set up? ###
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+* You will need a SimCom 5320 or 5360 dev board connected via USB
+* Run the reporter.py script in the simreported directory. It will copy over the files and compile them on the device.
 
 ### Contribution guidelines ###
 
